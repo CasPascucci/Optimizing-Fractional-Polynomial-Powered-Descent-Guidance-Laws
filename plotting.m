@@ -115,7 +115,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     set(gcf, 'Name', 'Optim Throttle')
     thrustDim = aTNormOpt .* mOptim *(refVals.M_ref*refVals.A_ref);
     
-    plot(tspanOpt(2:end)*T_ref, thrustDim(2:end)/problemParams.maxThrustDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+    plot(tspanOpt(1:end)*T_ref, thrustDim(1:end)/problemParams.maxThrustDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
     
     if isempty(findobj(gca, 'DisplayName', 'Max Thrust'))
         yline(1.0, 'k-', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
@@ -226,7 +226,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     set(gcf, 'Name', 'Opt Accel TOPO');
     set(gca, 'FontSize', 20);
     
-    plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimTOPO(:,2:end),2,1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName',legendTag);
+    plot(tspanOpt(1:end)*T_ref, vecnorm(aTOptimTOPO(:,1:end),2,1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName',legendTag);
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' East']);
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' North']);
     % plot(tspanOpt(2:end)*T_ref, aTOptimTOPO(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Up']);
@@ -328,12 +328,17 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         % Figure 8: TOPO Acceleration
         figure(8); hold on; grid on;
         set(gcf, 'Name', 'Sim TOPO Accel');
+        set(gca, 'FontSize', 20);
 
         plot(tTraj*T_ref, aT_norm_ENU, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         % plot(tTraj*T_ref, aE, 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' East']);
         % plot(tTraj*T_ref, aN, 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' North']);
         % plot(tTraj*T_ref, aU, 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Up']);
-
+        
+        if isempty(findobj(gca, 'DisplayName', 'Desired Final Acceleration, a_f^*'))
+            afStarDim = norm(nonDimParams.afStarND) * A_ref;
+            yline(afStarDim, 'k--', 'LineWidth', 1, 'DisplayName', 'Desired Final Acceleration, a_f^*');
+        end
         legend('Location', 'best');
         xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (TOPO)');
         if flag_thrustGotLimited

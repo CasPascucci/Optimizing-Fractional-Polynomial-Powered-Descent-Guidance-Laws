@@ -34,6 +34,8 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     lb = [optimizationParams.gamma1eps, 0, 0.01];
     ub = [5, 10, 15];
+    % lb = [0.1,0.5,0.01];
+    % ub = [0.1,0.5,15];
 
     fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
     'FiniteDifferenceType','forward','MaxIterations', 1000, ...
@@ -46,7 +48,6 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND, nonDimParams.m0ND);
     
     [optParams, optCost, exitflag, output] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
-
     if verboseOutput
         fprintf('=== Optimization Results ===\n');
         fprintf('Exit flag: %d\n', exitflag);
@@ -106,6 +107,12 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     [c1, c2] = calculateCoeffs(r0, v0, optParams(3), gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
+    if verboseOutput
+        fprintf('\nGuidance Coefficients:\n');
+        fprintf('  c1 = [%.6e, %.6e, %.6e]\n', c1(1), c1(2), c1(3));
+        fprintf('  c2 = [%.6e, %.6e, %.6e]\n', c2(1), c2(2), c2(3));
+    end
+
     tgospan = linspace(0,optParams(3),nodeCount);
     aTOptim = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
 
@@ -140,7 +147,7 @@ function cost = objectiveFunction(params, betaParam, afStar, rfStar, r, vfStar, 
         gamma2 = 0;
     end
 
-    
+
     [c1, c2] = calculateCoeffs(r, v, tgo, gamma1, gamma2, afStar, rfStar, vfStar, gConst);
 
     tspan = linspace(0,tgo,nodeCount);
