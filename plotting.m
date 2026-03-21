@@ -160,33 +160,33 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     set(gca, 'FontSize', 20);
     
     % Generate Glideslope Cone Visualization
-    if isempty(findobj(gca, 'Type', 'Surface'))
-        theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
-        Umin = 0; 
-        Umax = min(500, max(UTraj_HR(idx_plot), [], 'omitnan')); 
-        if isempty(Umax) || isnan(Umax); Umax = 500; end
-        U_samp = linspace(Umin, Umax, 360);
-        theta_deg = theta_fun(U_samp);
-        cosBound = cosd(theta_deg);
-        cosBound = max(cosBound, 1e-3);
-        R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
-        Rcap = 3000;
-        R_samp = min(R_samp, Rcap);
-        azimuth = linspace(0, 2*pi, 360);
-        [azGrid, altGrid] = meshgrid(azimuth, U_samp);
-        [~, rGrid] = meshgrid(azimuth, R_samp);
-        eastGrid  = rGrid .* cos(azGrid);
-        northGrid = rGrid .* sin(azGrid);
-        
-        surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
-        % Plateau Ring
-        UPlat = Umax; RPlat = Rcap;
-        azPlat = linspace(0, 2*pi, 360);
-        eastPlat = RPlat * cos(azPlat);
-        northPlat = RPlat * sin(azPlat);
-        UPlat = UPlat * ones(size(azPlat));
-        plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
-    end
+    % if isempty(findobj(gca, 'Type', 'Surface'))
+    %     theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
+    %     Umin = 0; 
+    %     Umax = min(500, max(UTraj_HR(idx_plot), [], 'omitnan')); 
+    %     if isempty(Umax) || isnan(Umax); Umax = 500; end
+    %     U_samp = linspace(Umin, Umax, 360);
+    %     theta_deg = theta_fun(U_samp);
+    %     cosBound = cosd(theta_deg);
+    %     cosBound = max(cosBound, 1e-3);
+    %     R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
+    %     Rcap = 3000;
+    %     R_samp = min(R_samp, Rcap);
+    %     azimuth = linspace(0, 2*pi, 360);
+    %     [azGrid, altGrid] = meshgrid(azimuth, U_samp);
+    %     [~, rGrid] = meshgrid(azimuth, R_samp);
+    %     eastGrid  = rGrid .* cos(azGrid);
+    %     northGrid = rGrid .* sin(azGrid);
+    % 
+    %     cone1 = surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
+    %     % Plateau Ring
+    %     UPlat = Umax; RPlat = Rcap;
+    %     azPlat = linspace(0, 2*pi, 360);
+    %     eastPlat = RPlat * cos(azPlat);
+    %     northPlat = RPlat * sin(azPlat);
+    %     UPlat = UPlat * ones(size(azPlat));
+    %     cone2 = plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
+    % end
     
     % Main Trajectory
     plot3(ETraj_HR(idx_plot)/1000, NTraj_HR(idx_plot)/1000, UTraj_HR(idx_plot)/1000, '.-', 'Color', runColor, 'LineWidth', 2, 'MarkerSize',5, 'DisplayName', legendTag);
@@ -409,37 +409,48 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
         % Figure 12: Pointing Angle Analysis
     
-        aMag   = vecnorm([aE aN aU], 2, 2);
-        thrustU_ENU = [aE aN aU] ./ aMag;          
-        dotUp       = max(-1, min(1, thrustU_ENU(:,3)));   
-        phiSim      = acosd(dotUp);
+        % Use optimization trajectory instead of sim
+        aE_opt = aTOptimTOPO(1,:)';
+        aN_opt = aTOptimTOPO(2,:)';
+        aU_opt = aTOptimTOPO(3,:)';
+        aMag_opt = vecnorm([aE_opt aN_opt aU_opt], 2, 2);
+        thrustU_opt = [aE_opt aN_opt aU_opt] ./ aMag_opt;
+        dotUp_opt = max(-1, min(1, thrustU_opt(:,3)));
+        phiOpt = acosd(dotUp_opt);
+
 
         figure(12);
         set(gcf, 'Name', 'Pointing Analysis');
         set(gca, 'FontSize', 20);
-        subplot(2,1,1); hold on; grid on;
-        plot(tTraj*T_ref, phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        % subplot(2,1,1); hold on; grid on;
+        % set(gca, 'FontSize', 20);
+        plot(tspanOpt*T_ref, phiOpt, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        hold on; grid on;
         if optimParams.pointingEnabled
             phi0_deg   = optimParams.minPointing;
-            tgoSim = (tTraj(end) - tTraj) * T_ref; 
-            phiA_deg = 0.5 * (optimParams.maxTiltAccel) .* (tgoSim.^2);
-            ThetaSim = min(180, phi0_deg + phiA_deg);
-            plot(tTraj*T_ref, ThetaSim, '--', 'Color', runColor, 'LineWidth', 2, 'DisplayName','\Theta Limit');
+            tgoOpt = tgospanOpt' * T_ref;
+            phiA_opt = 0.5 * optimParams.maxTiltAccel .* (tgoOpt.^2);
+            ThetaOpt = min(180, phi0_deg + phiA_opt);
+            plot(tspanOpt*T_ref, ThetaOpt, '--', 'Color', runColor, 'LineWidth', 2, 'DisplayName','\Theta Limit');
 
-            xlabel('Time s'); ylabel('Angle deg');
+            xlabel('Time s'); ylabel('Degrees');
             title('Pointing Angle vs Limit');
             legend('Location','bestoutside');
             
-            subplot(2,1,2); hold on; grid on;
-            plot(tTraj*T_ref, ThetaSim - phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
-            if isempty(findobj(gca, 'DisplayName', 'Zero'))
-                 yline(0, 'k-', 'HandleVisibility', 'off');
-            end
-
-        end
-            xlabel('Time s'); ylabel('deg');
-            title('Pointing margin (positive means within limit)');
+            % subplot(2,1,2); hold on; grid on;
+            % plot(tspanOpt*T_ref, ThetaOpt - phiOpt, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+            % if isempty(findobj(gca, 'DisplayName', 'Zero'))
+            %      yline(0, 'k-', 'HandleVisibility', 'off');
+            % end
+            % title('Pointing margin (positive means within limit)');
+            % xlabel('Time s'); ylabel('Degrees of Margin');
+            % legend('Location','bestoutside');
+        else
+            xlabel('Time s'); ylabel('Degrees');
+            title('Pointing Angle vs Limit');
             legend('Location','bestoutside');
+        end
+
     else
         fprintf('\n=== NOTE: Simulation plots skipped (runSimulation = false) ===\n');
     end
