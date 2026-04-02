@@ -34,13 +34,12 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
 
     lb = [optimizationParams.gamma1eps, 0, 0.01];
     ub = [5, 10, 15];
-    % lb = [0.1,0.5,0.01];
-    % ub = [0.1,0.5,15];
+    % lb = [0.3,0.757,0.01];
+    % ub = [0.3,0.757,15];
 
     fminconOptions = optimoptions('fmincon', 'Display', 'none', 'MaxFunctionEvaluations', 10000, ...
     'FiniteDifferenceType','forward','MaxIterations', 1000, ...
-    'Algorithm','sqp', 'EnableFeasibilityMode',true, ...
-    'HessianApproximation','lbfgs','HonorBounds',false, 'OptimalityTolerance',1e-4);
+    'Algorithm','sqp', 'OptimalityTolerance',1e-4);
 
     nodeCount = optimizationParams.nodeCount;
 
@@ -177,7 +176,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     aT = afStar + c1*tgospan.^gamma1 + c2*tgospan.^gamma2;
     aTmag = vecnorm(aT,2,1);
 
-    Q = cumtrapz(tgospan,aTmag./isp); % cumulative integral of fuel expenditure correlary
+    Q = cumtrapz(tgospan,aTmag./isp); % cumulative integral of fuel expenditure
     Q = Q(end) - Q;
 
     m = m0 .* exp(-Q); % Convert Q actually into mass units

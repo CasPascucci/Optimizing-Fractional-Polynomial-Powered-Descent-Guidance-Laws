@@ -26,7 +26,7 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
     X0 = [r0; v0; m0];
     odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
      [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma, kr, ...
-                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT, monteCarloSeed), linspace(0,tgo0,500), X0, odeoptions);
+                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT, monteCarloSeed), [0,tgo0], X0, odeoptions);
 
      rState = stateTraj(:,1:3);
      vState = stateTraj(:,4:6);
