@@ -54,67 +54,30 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
          maxAccel = nonDimParams.maxThrustND/m;
          % BTT
          
-         if BTT
-             if (tgo * refVals.T_ref) > (1.5*delta_t)
-                 [rfVirtual, vfVirtual, afVirtual, tgoVirt] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, delta_t, tgo, gGuidance);
-                 aT1 = gamma*(kr/(2*gamma +4) -1)*afVirtual;
-                 aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
-                 aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
-                 aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
-                 aTi = aT1 + aT2 + aT3 + aT4;
-                 if ~isempty(monteCarloSeed)
-                    aTi = aTi * monteCarloSeed;
-                 end
-                 if norm(aTi) > maxAccel
-                     aTi = aTi / norm(aTi) * maxAccel;
-                     flag_thrustGotLimited = true;
-                 elseif norm(aTi) < minAccel
-                     aTi = aTi / norm(aTi) * minAccel;
-                     flag_thrustGotLimited = true;
-                 end
-             else
-                 aT1 = gamma*(kr/(2*gamma +4) -1)*afVirtual;
-                 aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
-                 aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
-                 aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
-                 aTi = aT1 + aT2 + aT3 + aT4;
-                 if ~isempty(monteCarloSeed)
-                    aTi = aTi * monteCarloSeed;
-                 end
-                 if norm(aTi) > maxAccel
-                     aTi = aTi / norm(aTi) * maxAccel;
-                     flag_thrustGotLimited = true;
-                 elseif norm(aTi) < minAccel
-                     aTi = aTi / norm(aTi) * minAccel;
-                     flag_thrustGotLimited = true;
-                 end
+         if (tgo * refVals.T_ref) > 0.2
+             aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
+             aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
+             aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
+             aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
+             aTi = aT1 + aT2 + aT3 + aT4;
+             if ~isempty(monteCarloSeed)
+                aTi = aTi * monteCarloSeed;
              end
-         else    % No BTT
-             if (tgo * refVals.T_ref) > 0.2
-                 aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
-                 aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
-                 aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
-                 aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
-                 aTi = aT1 + aT2 + aT3 + aT4;
-                 if ~isempty(monteCarloSeed)
-                    aTi = aTi * monteCarloSeed;
-                 end
-                 if norm(aTi) > maxAccel
-                     aTi = aTi / norm(aTi) * maxAccel;
-                     flag_thrustGotLimited = true;
-                 elseif norm(aTi) < minAccel
-                     aTi = aTi / norm(aTi) * minAccel;
-                     flag_thrustGotLimited = true;
-                 end
-             else
-                 aTi = aTList(:,idx-1);
+             if norm(aTi) > maxAccel
+                 aTi = aTi / norm(aTi) * maxAccel;
+                 flag_thrustGotLimited = true;
+             elseif norm(aTi) < minAccel
+                 aTi = aTi / norm(aTi) * minAccel;
+                 flag_thrustGotLimited = true;
              end
-
+         else
+             aTi = aTList(:,idx-1);
          end
-         aTList(:,idx) = aTi;
-         aTNormList(idx) = norm(aTi);
+
      end
-end
+     aTList(:,idx) = aTi;
+     aTNormList(idx) = norm(aTi);
+ end
 
 
 %% Functions
@@ -135,59 +98,25 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
     persistent vfVirtual
     persistent afVirtual
     persistent tgoVirt
-    if BTT
-        if (tgo * T_ref) > (1.5*delta_t)
-            [rfVirtual, vfVirtual, afVirtual, tgoVirt] = computeBeyondTerminationTargeting(r, v, gamma, kr, rfStar, vfStar, afStar, delta_t, tgo, gGuidance);
-            aT1 = gamma*(kr/(2*gamma +4) -1)*afVirtual;
-            aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
-            aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
-            aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);
-            aT = aT1 + aT2 + aT3 + aT4;
-            if ~isempty(monteCarloSeed)
-                aT = aT * monteCarloSeed;
-            end
-            if norm(aT) > maxAccel
-                aT = aT / norm(aT) * maxAccel;
-            elseif norm(aT) < minAccel
-                aT = aT / norm(aT) * minAccel;
-            end
-            
-        else
 
-            aT1 = gamma*(kr/(2*gamma +4) -1)*afVirtual;
-            aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
-            aT3 = ((gamma+1)/tgoVirt)*(1-kr/(gamma+2))*(vfVirtual-v);
-            aT4 = (kr/tgoVirt^2)*(rfVirtual-r-v*tgoVirt);  
-            aT = aT1 + aT2 + aT3 + aT4;
-            if ~isempty(monteCarloSeed)
-                aT = aT * monteCarloSeed;
-            end
-            if norm(aT) > maxAccel
-                aT = aT / norm(aT) * maxAccel;
-            elseif norm(aT) < minAccel
-                aT = aT / norm(aT) * minAccel;
-            end
+    if (tgo * T_ref) > 0.2
+        aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
+        aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
+        aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
+        aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
+        aT = aT1 + aT2 + aT3 + aT4;
+        if ~isempty(monteCarloSeed)
+            aT = aT * monteCarloSeed;
+        end
+        if norm(aT) > maxAccel
+            aT = aT / norm(aT) * maxAccel;
+        elseif norm(aT) < minAccel
+            aT = aT / norm(aT) * minAccel;
         end
     else
-        if (tgo * T_ref) > 0.2
-            aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
-            aT2 = (gamma*kr/(2*gamma+4)-gamma-1)*gGuidance;
-            aT3 = ((gamma+1)/tgo)*(1-kr/(gamma+2))*(vfStar-v);
-            aT4 = (kr/tgo^2)*(rfStar-r-v*tgo);
-            aT = aT1 + aT2 + aT3 + aT4;
-            if ~isempty(monteCarloSeed)
-                aT = aT * monteCarloSeed;
-            end
-            if norm(aT) > maxAccel
-                aT = aT / norm(aT) * maxAccel;
-            elseif norm(aT) < minAccel
-                aT = aT / norm(aT) * minAccel;
-            end
-        else
-            aT=aT;
-        end
-
+        aT=aT;
     end
+
     F_mag = norm(aT) * mass;
     dm_dt = -F_mag / (isp);
     dXdt = [v; aT + g; dm_dt];
