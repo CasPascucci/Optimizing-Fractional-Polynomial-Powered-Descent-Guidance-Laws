@@ -73,11 +73,10 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
          else
              aTi = aTList(:,idx-1);
          end
-
+         aTList(:,idx) = aTi;
+         aTNormList(idx) = norm(aTi);
      end
-     aTList(:,idx) = aTi;
-     aTNormList(idx) = norm(aTi);
- end
+end
 
 
 %% Functions
