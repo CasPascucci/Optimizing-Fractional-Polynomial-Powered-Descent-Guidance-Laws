@@ -159,34 +159,34 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     set(gcf, 'Name', 'Optimization 3D');
     set(gca, 'FontSize', 20);
     
-    % Generate Glideslope Cone Visualization
-    % if isempty(findobj(gca, 'Type', 'Surface'))
-    %     theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
-    %     Umin = 0; 
-    %     Umax = min(500, max(UTraj_HR(idx_plot), [], 'omitnan')); 
-    %     if isempty(Umax) || isnan(Umax); Umax = 500; end
-    %     U_samp = linspace(Umin, Umax, 360);
-    %     theta_deg = theta_fun(U_samp);
-    %     cosBound = cosd(theta_deg);
-    %     cosBound = max(cosBound, 1e-3);
-    %     R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
-    %     Rcap = 3000;
-    %     R_samp = min(R_samp, Rcap);
-    %     azimuth = linspace(0, 2*pi, 360);
-    %     [azGrid, altGrid] = meshgrid(azimuth, U_samp);
-    %     [~, rGrid] = meshgrid(azimuth, R_samp);
-    %     eastGrid  = rGrid .* cos(azGrid);
-    %     northGrid = rGrid .* sin(azGrid);
-    % 
-    %     cone1 = surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
-    %     % Plateau Ring
-    %     UPlat = Umax; RPlat = Rcap;
-    %     azPlat = linspace(0, 2*pi, 360);
-    %     eastPlat = RPlat * cos(azPlat);
-    %     northPlat = RPlat * sin(azPlat);
-    %     UPlat = UPlat * ones(size(azPlat));
-    %     cone2 = plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
-    % end
+    %Generate Glideslope Cone Visualization
+    if isempty(findobj(gca, 'Type', 'Surface'))
+        theta_fun = @(u) min(89.9, 45 + 45 * max(0, min(1, (u - 250) ./ 250))); 
+        Umin = 0; 
+        Umax = min(500, max(UTraj_HR(idx_plot), [], 'omitnan')); 
+        if isempty(Umax) || isnan(Umax); Umax = 500; end
+        U_samp = linspace(Umin, Umax, 360);
+        theta_deg = theta_fun(U_samp);
+        cosBound = cosd(theta_deg);
+        cosBound = max(cosBound, 1e-3);
+        R_samp = U_samp .* sqrt(1 - cosBound.^2) ./ cosBound; 
+        Rcap = 3000;
+        R_samp = min(R_samp, Rcap);
+        azimuth = linspace(0, 2*pi, 360);
+        [azGrid, altGrid] = meshgrid(azimuth, U_samp);
+        [~, rGrid] = meshgrid(azimuth, R_samp);
+        eastGrid  = rGrid .* cos(azGrid);
+        northGrid = rGrid .* sin(azGrid);
+
+        cone1 = surf(eastGrid/1000, northGrid/1000, altGrid/1000,altGrid/1000,'EdgeAlpha',0.15,'FaceAlpha',0.4,'MeshStyle','row','LineWidth',0.8, 'HandleVisibility','off');
+        % Plateau Ring
+        UPlat = Umax; RPlat = Rcap;
+        azPlat = linspace(0, 2*pi, 360);
+        eastPlat = RPlat * cos(azPlat);
+        northPlat = RPlat * sin(azPlat);
+        UPlat = UPlat * ones(size(azPlat));
+        cone2 = plot3(eastPlat/1000, northPlat/1000, UPlat/1000, 'k--', 'LineWidth', 0.8, 'HandleVisibility','off');
+    end
     
     % Main Trajectory
     plot3(ETraj_HR(idx_plot)/1000, NTraj_HR(idx_plot)/1000, UTraj_HR(idx_plot)/1000, '.-', 'Color', runColor, 'LineWidth', 2, 'MarkerSize',5, 'DisplayName', legendTag);
@@ -205,7 +205,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     vdOptimDim = vdOptim * V_ref;
     vdOptimTOPO = MCMF2ENU(vdOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
     figure(4); hold on; grid on;
-    set(gcf, 'Name', 'Opt Vel TOPO');
+    set(gcf, 'Name', 'Opt Vel');
     set(gca, 'FontSize', 20);
     
     plot(tspanOpt*T_ref, vecnorm(vdOptimTOPO, 2, 1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
@@ -215,7 +215,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
 
     legend('Location', 'best');
-    xlabel('Time s'); ylabel('Velocity m/s'); title('Planned Velocity Profile (TOPO)');
+    xlabel('Time s'); ylabel('Velocity m/s'); title('Optimization Velocity Profile');
     grid on;
     xlim([0, ceil(max(tspanOpt*T_ref)/100)*100]);
 
@@ -223,7 +223,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     aTOptimDim = aTOptim * A_ref;
     aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
     figure(5); hold on; grid on;
-    set(gcf, 'Name', 'Opt Accel TOPO');
+    set(gcf, 'Name', 'Opt Accel');
     set(gca, 'FontSize', 20);
     
     plot(tspanOpt(1:end)*T_ref, vecnorm(aTOptimTOPO(:,1:end),2,1), '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName',legendTag);
@@ -236,7 +236,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         yline(afStarDim, 'k--', 'LineWidth', 1, 'DisplayName', 'Desired Final Acceleration, a_f^*');
     end
     legend('Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Planned Accel Profile (TOPO)');
+    xlabel('Time s'); ylabel('Accel m/s^2'); title('Optimization Acceleration Profile');
     grid on;
 
     % % Figure 6: Optimization MCMF Acceleration

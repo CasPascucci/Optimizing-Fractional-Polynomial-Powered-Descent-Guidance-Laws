@@ -1,4 +1,4 @@
-function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable] = ...
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable, nActiveConstraints] = ...
     getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation, monteCarloSeed)
     
     if nargin > 10
@@ -117,13 +117,13 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     reopt = optimizationParams.updateOpt;
     fprintf("=== Starting Optimization ===\n");
     OptTimer = tic;
-    [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
+    [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = ...
         optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
     optTime = toc(OptTimer);
     fprintf("Optimization Time: %.3fs\n", optTime);
     if exitflag ~= 1
         fprintf("\n First Optimization Converged to flag ~=1, rerunning optimization starting from first rounds parameters:\n");
-        [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
+        [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = ...
         optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
     end
 

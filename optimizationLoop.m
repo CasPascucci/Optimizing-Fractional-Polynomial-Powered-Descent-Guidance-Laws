@@ -1,4 +1,4 @@
-function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_t, verboseOutput, dispersion)
+function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_t, verboseOutput, dispersion)
 
     % Some Tweakable Parameters / Defaults
     if optimizationParams.gamma1eps < 0
@@ -47,6 +47,17 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     nonlincon = @(params) nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gConst, isp, minThrust, maxThrust, optimizationParams, problemParams, refVals, rot_MCMF2ENU, r0_MCMF_ND, nonDimParams.m0ND);
     
     [optParams, optCost, exitflag, output] = fmincon(obj, paramsX0, Aineq, bineq, [], [], lb, ub, nonlincon, fminconOptions);
+    % Compute active constraint count (always, not just in verbose mode)
+    [c, ~] = nonlincon(optParams);
+    activeIneq = find(c >= -1e-6); % Nearly active
+    nActiveConstraints = length(activeIneq);
+    if abs(optParams(1) - optimizationParams.gamma1eps) < 1e-3
+        nActiveConstraints = nActiveConstraints + 1;
+    end
+    if abs(optParams(2) - optParams(1)) - optimizationParams.gamma1eps < 1e-3
+        nActiveConstraints = nActiveConstraints + 1;
+    end
+
     if verboseOutput
         fprintf('=== Optimization Results ===\n');
         fprintf('Exit flag: %d\n', exitflag);
@@ -58,22 +69,13 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
         fprintf('  gamma = %.6f\n', optParams(1));
         fprintf('  gamma2    = %.6f\n', optParams(2));
         fprintf('  tgo   = %.6f (ND)\n', optParams(3));
-    
-        [c, ~] = nonlincon(optParams);
-        activeIneq = find(c >= -1e-6); % Nearly active
-        numActiveIneq = length(activeIneq);
+
         activeIneqString = strjoin(string(activeIneq),', ');
-        if abs(optParams(1) - optimizationParams.gamma1eps) < 1e-3
-            numActiveIneq = numActiveIneq + 1;
-        end
-        if abs(optParams(2) - optParams(1)) - optimizationParams.gamma1eps < 1e-3
-            numActiveIneq = numActiveIneq + 1;
-        end
-        fprintf('\nTotal active inequality constraints: %d/%d\n', numActiveIneq, length(c));
+        fprintf('\nTotal active inequality constraints: %d/%d\n', nActiveConstraints, length(c));
         if ~isempty(activeIneq)
             fprintf("Constraints #: %s\n", activeIneqString);
         end
-        if length(activeIneq) ~= numActiveIneq
+        if length(activeIneq) ~= nActiveConstraints
             fprintf("Linear constraint also active\n");
         end
         [maxViolation, idx] = max(c);
@@ -121,7 +123,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = opt
     phi2bar = (tgospan.^(gamma2+1))./(gamma2+1);
 
     rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gConst+afStar).*tgospan.^2;
-    vdOptim = vfStar + c1*phi1bar + c2*phi2bar -(gConst+afStar).*tgospan;
+    vdOptim = vfStar - c1*phi1bar - c2*phi2bar -(gConst+afStar).*tgospan;
 
     aTNorm = vecnorm(aTOptim,2,1);
 

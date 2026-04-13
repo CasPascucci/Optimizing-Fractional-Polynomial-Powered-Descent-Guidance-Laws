@@ -62,7 +62,7 @@ if verboseOutput
     fprintf('==========================================\n\n');
 end
 segmentCount = 0;
-minTime = 0.2/refVals.T_ref; % Time to stop sim at the end, remove once BTT implemented
+minTime = 0.2/refVals.T_ref; % Time to stop sim at the end
 
 % Main loop
     while tgo > updateStopND % keep looping until update stop time

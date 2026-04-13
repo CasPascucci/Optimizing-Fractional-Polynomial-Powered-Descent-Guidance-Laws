@@ -3,9 +3,11 @@ clear all;  clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 0.7;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 0.9;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
+% First IC set is for everything but GS
 paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional seconds)
+%paramsIC = [0.5, 0.8, 700]; % Use for GS, recommended to stay to higher values
 
 glideSlopeEnabled = false;
 pointingEnabled = false;
@@ -59,7 +61,7 @@ optimizationParams.minPointing     = 10; % deg
 
 % Re-Optimization Settings
 optimizationParams.updateOpt  = reOptimizationEnabled; 
-optimizationParams.updateFreq = 10;   % s
+optimizationParams.updateFreq = 30;   % s
 optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
 
 % Tolerances
