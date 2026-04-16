@@ -2,15 +2,15 @@ clear all; clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-betaVec = [0.9, 0.7, 0.5, 0.2, 0.0];
+betaVec = 0.95;
 %betaVec = 1.0:-0.05:0.0
 
 paramsIC = [0.3, 0.4, 700]; % Good for everything but GS
-%paramsIC = [0.5, 0.8, 700]; % Use for GS
+% paramsIC = [0.5, 0.8, 700]; % Use for GS
 
 glideSlopeEnabled    = false;
-pointingEnabled      = true;
-reOptimizationEnabled = false;
+pointingEnabled      = false;
+reOptimizationEnabled = true;
 divertEnabled        = false;
 
 %% 1. Initial State Definitions
@@ -57,7 +57,7 @@ optimizationParams.updateStop = 120;
 optimizationParams.gamma1eps  = 1e-2;
 optimizationParams.gamma2eps  = 1e-2;
 
-% Divert setup (unchanged from your original)
+% Divert setup
 divertDistances = [1000, 2000, 3000];
 divert1E = zeros(length(divertDistances),1); % each line here sets up the North and East Coordinates of the divert points
 divert1N = divertDistances';
@@ -127,19 +127,24 @@ for i = 1:nBeta
     results(i).exitFlag       = optExitFlag;
     results(i).nActive        = nActive;
     results(i).exitFlags      = exitFlags;
+    if ~isempty(finalPosSim)
+        results(i).simLandingError = norm(finalPosSim);  % [m]
+    else
+        results(i).simLandingError = NaN;
+    end
 end
 
 %% 4. Summary Table
 fprintf('\n\n========== SWEEP SUMMARY ==========\n');
-fprintf('%-8s %-10s %-10s %-8s %-12s %-8s %-12s %-12s %-8s %-8s\n', ...
-        'Beta', 'Gamma1', 'Gamma2', 'Kr', 'Tgo (s)', 'Cost', 'Opt Fuel', 'Sim Fuel', 'ExitFlag', 'NActive');
-fprintf('%s\n', repmat('-', 1, 94));
+fprintf('%-8s %-10s %-10s %-8s %-12s %-8s %-12s %-12s %-12s %-8s %-8s\n', ...
+        'Beta', 'Gamma1', 'Gamma2', 'Kr', 'Tgo (s)', 'Cost', 'Opt Fuel', 'Sim Fuel', 'SimErr (m)', 'ExitFlag', 'NActive');
+fprintf('%s\n', repmat('-', 1, 106));
 
 for i = 1:nBeta
     r = results(i);
-    fprintf('%-8.4f %-10.4f %-10.4f %-8.4f %-12.2f %-8.4f %-12.2f %-12.2f %-8d %-8d\n', ...
+    fprintf('%-8.4f %-10.4f %-10.4f %-8.4f %-12.2f %-8.4f %-12.2f %-12.2f %-12.3f %-8d %-8d\n', ...
             r.beta, r.gammaOpt, r.gamma2Opt, r.krOpt, ...
-            r.tgoOptSec, r.costValue, r.optFuelCost, r.simFuelCost, r.exitFlag, r.nActive);
+            r.tgoOptSec, r.costValue, r.optFuelCost, r.simFuelCost, r.simLandingError, r.exitFlag, r.nActive);
 
 end
 

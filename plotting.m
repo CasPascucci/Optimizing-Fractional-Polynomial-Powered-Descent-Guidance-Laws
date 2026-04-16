@@ -117,13 +117,14 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     
     plot(tspanOpt(1:end)*T_ref, thrustDim(1:end)/problemParams.maxThrustDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
     
-    if isempty(findobj(gca, 'DisplayName', 'Max Thrust'))
-        yline(1.0, 'k-', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
-        yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'k-', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+    if isempty(findobj(gca, 'DisplayName', 'Max Throttle'))
+        yline(1.0, 'k--', 'LineWidth', 1, 'DisplayName', 'Max Throttle');
+        yline(problemParams.minThrustDim/problemParams.maxThrustDim, 'k--', 'LineWidth', 1, 'DisplayName', 'Min Throttle');
     end
-    
+
     xlabel('Time s'); ylabel('Throttle Fraction');
     title('Optimization Throttle Profile');
+    ylim([0, 1.2]);
     legend('Location','best');
     set(gca, 'FontSize', 20);
 
@@ -268,7 +269,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         UTrajSim = Up(idx_sim);
 
         figure(6); hold on; grid on; axis equal;
-        set(gcf, 'Name', 'Sim 3D');
+        set(gcf, 'Name', 'Simulation 3D');
         set(gca, 'FontSize', 20);
 
         if isempty(findobj(gca, 'Type', 'Surface'))
@@ -303,7 +304,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
 
         xlabel('East (km)'); ylabel('North (km)'); zlabel('Up (km)');
-        title('3D Trajectory (Sim) Final 2 KM');
+        title('Simulation 3D Trajectory (Final 2km)');
         view(80, 15); camproj orthographic;
         zlim([0, 2]); xlim([-3,3]); ylim([-3,3]); axis square;
         legend('Location','bestoutside');
@@ -314,7 +315,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         arcLength = rMoon * central;
         
         figure(7); hold on; grid on;
-        set(gcf, 'Name', 'Sim Range vs Altitude');
+        set(gcf, 'Name', 'Simulation Ground Range vs Alt');
         set(gca, 'FontSize', 20);
         plot(arcLength/1000, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         if norm([alt_m(end), arcLength(end)]) > 1
@@ -322,12 +323,12 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         end
 
         xlabel('Range (km)'); ylabel('Up (km)');
-        title('Sim Range vs Altitude'); grid on;
+        title('Simulation Flight Path (Range vs Alt)'); grid on;
         legend('Location','best');
 
         % Figure 8: TOPO Acceleration
         figure(8); hold on; grid on;
-        set(gcf, 'Name', 'Sim TOPO Accel');
+        set(gcf, 'Name', 'Sim Accel');
         set(gca, 'FontSize', 20);
 
         plot(tTraj*T_ref, aT_norm_ENU, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
@@ -340,7 +341,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             yline(afStarDim, 'k--', 'LineWidth', 1, 'DisplayName', 'Desired Final Acceleration, a_f^*');
         end
         legend('Location', 'best');
-        xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (TOPO)');
+        xlabel('Time s'); ylabel('Accel m/s^2'); title('Simulation Acceleration Profile');
         if flag_thrustGotLimited
             subtitle("Thrust is being Throttled");
         end
@@ -371,34 +372,37 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         % plot(tTraj*T_ref, vU, 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Up']);
 
         legend('Location', 'best');
-        xlabel('Time s'); ylabel('Velocity m/s'); title('Sim Velocity Profile (Dim)');
+        xlabel('Time s'); ylabel('Velocity m/s'); title('Simulation Velocity Profile');
         grid on;
         
-        % Figure 10: Throttle and Mass
+        % Figure 10: Throttle
         figure(10);
-        set(gcf, 'Name', 'Sim Throttle and Mass');
+        set(gcf, 'Name', 'Sim Throttle');
         set(gca, 'FontSize', 20);
-
-        subplot(2,1,1); hold on; grid on;
+        hold on; grid on;
         thrustDim = aTDimNorm' .* mDim;
         plot(tTraj*T_ref, thrustDim/maxThrustDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         if isempty(findobj(gca, 'DisplayName', 'Max Throttle'))
-            yline(1.0,'k--','LineWidth',1,'DisplayName','Max Throttle'); 
-            yline(minThrustDim/maxThrustDim,'k--','LineWidth',1,'DisplayName','Min Throttle');
+            yline(1.0, 'k-', 'LineWidth', 1, 'DisplayName', 'Max Throttle');
+            yline(minThrustDim/maxThrustDim, 'k-', 'LineWidth', 1, 'DisplayName', 'Min Throttle');
         end
-        xlabel('Time s'); ylabel('Throttle Fraction'); title('Time vs Throttle (Sim)'); 
-        legend('Location','best'); grid on;
+        xlabel('Time s'); ylabel('Throttle Fraction'); title('Simulation Throttle Profile');
+        ylim([0, 1.2]);
+        legend('Location','best');
         
-        subplot(2,1,2); hold on; grid on;
+        % Figure 11: Mass
+        figure(11);
+        set(gcf, 'Name', 'Sim Mass');
+        set(gca, 'FontSize', 20);
+        hold on; grid on;
         plot(tTraj*T_ref, mDim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
         xlabel('Time s'); ylabel('Mass kg'); title('Vehicle Mass vs Time');
         legend('Location','best');
-        
-        propUsedC  = max(0, mDim(1) - mDim(end));
+        propUsedC = max(0, mDim(1) - mDim(end));
         subtitle(sprintf('Propellant used = %.1f kg', propUsedC));
 
-        % Figure 11: Time vs Altitude
-        figure(11); hold on; grid on;
+        % Figure 12: Time vs Altitude
+        figure(12); hold on; grid on;
         set(gcf, 'Name', 'Sim Alt');
         set(gca, 'FontSize', 20);
         plot(tTraj*T_ref, alt_m/1000, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
@@ -407,7 +411,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         legend('Location','best');
         grid on;
 
-        % Figure 12: Pointing Angle Analysis
+        % Figure 13: Pointing Angle Analysis
     
         % Use optimization trajectory instead of sim
         aE_opt = aTOptimTOPO(1,:)';
@@ -419,7 +423,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         phiOpt = acosd(dotUp_opt);
 
 
-        figure(12);
+        figure(13);
         set(gcf, 'Name', 'Pointing Analysis');
         set(gca, 'FontSize', 20);
         % subplot(2,1,1); hold on; grid on;
@@ -435,7 +439,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
             xlabel('Time s'); ylabel('Degrees');
             title('Pointing Angle vs Limit');
-            legend('Location','bestoutside');
+            legend('Location','best');
             
             % subplot(2,1,2); hold on; grid on;
             % plot(tspanOpt*T_ref, ThetaOpt - phiOpt, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
@@ -450,6 +454,27 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             title('Pointing Angle vs Limit');
             legend('Location','bestoutside');
         end
+        % Figure 14: Pointing Angle Analysis (Simulation)
+        aMag_sim = vecnorm(aT_ENU, 2, 2);
+        thrustU_sim = aT_ENU ./ aMag_sim;
+        dotUp_sim = max(-1, min(1, thrustU_sim(:,3)));
+        phiSim = acosd(dotUp_sim);
+
+        figure(14);
+        set(gcf, 'Name', 'Pointing Analysis (Simulation)');
+        set(gca, 'FontSize', 20);
+        plot(tTraj*T_ref, phiSim, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
+        hold on; grid on;
+        if optimParams.pointingEnabled
+            phi0_deg  = optimParams.minPointing;
+            tgoSim    = (tgo0 - tTraj) * T_ref;
+            phiA_sim  = 0.5 * optimParams.maxTiltAccel .* (tgoSim.^2);
+            ThetaSim  = min(180, phi0_deg + phiA_sim);
+            plot(tTraj*T_ref, ThetaSim, '--', 'Color', runColor, 'LineWidth', 2, 'DisplayName', '\Theta Limit');
+        end
+        xlabel('Time s'); ylabel('Degrees');
+        title('Pointing Angle vs Limit (Simulation)');
+        legend('Location','best');
 
     else
         fprintf('\n=== NOTE: Simulation plots skipped (runSimulation = false) ===\n');
@@ -457,7 +482,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     %% 4. Parameter History (Re-Optimization Only)
     if ~isempty(optHistory) && exist('ICstates', 'var') && ~isempty(ICstates)
-        figure(13);
+        figure(15);
         set(gcf, 'Name', 'ReOpt Parameter History');
         
         t_elapsedND = table2array(optHistory(:,1));
@@ -500,12 +525,12 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         tgoStaticAtUpdate = tgoInitial - x_opt;
         tgoDiff = tgoStaticAtUpdate - tgoSolved;
         
-        subplot(3,2,1); hold on; grid on; plot(x_opt, gamma_hist, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\gamma_1'); grid on; xlabel('Time s'); legend('Location','northwest');
-        subplot(3,2,2); hold on; grid on; plot(x_opt, gamma2_hist, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\gamma_2'); grid on; xlabel('Time s');
-        subplot(3,2,3); hold on; grid on; plot(x_opt, tgoSolved, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('t_{go} Solved'); grid on; xlabel('Time s');
-        subplot(3,2,4); hold on; grid on; plot(x_opt, c1_norm, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('||c_1||'); grid on; xlabel('Time s');
-        subplot(3,2,5); hold on; grid on; plot(x_opt, c2_norm, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('||c_2||'); grid on; xlabel('Time s');
-        subplot(3,2,6); hold on; grid on; stairs(x_opt, tgoDiff, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
+        subplot(2,1,1); hold on; grid on; plot(x_opt, gamma_hist, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\gamma_1'); grid on; xlabel('Time s'); legend('Location','northwest');
+        subplot(2,1,2); hold on; grid on; plot(x_opt, gamma2_hist, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\gamma_2'); grid on; xlabel('Time s');
+        % subplot(3,2,3); hold on; grid on; plot(x_opt, tgoSolved, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('t_{go} Solved'); grid on; xlabel('Time s');
+        % subplot(3,2,4); hold on; grid on; plot(x_opt, c1_norm, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('||c_1||'); grid on; xlabel('Time s');
+        % subplot(3,2,5); hold on; grid on; plot(x_opt, c2_norm, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('||c_2||'); grid on; xlabel('Time s');
+        % subplot(3,2,6); hold on; grid on; stairs(x_opt, tgoDiff, 'LineWidth', 2, 'Color', runColor, 'DisplayName', legendTag); title('\Delta t_{go} (Static - ReOpt)'); ylabel('s'); xlabel('Time s'); grid on;
         
         sgtitle('Optimization Parameters Through Reoptimization');
         set(gca, 'FontSize', 20);
