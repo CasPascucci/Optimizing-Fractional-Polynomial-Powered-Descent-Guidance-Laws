@@ -1,7 +1,7 @@
-folder = 'Thesis Figures/OptVsSim/GS';
+folder = 'Thesis Figures/DIDO Comparisons';
 
 pairs = {
-    'Optim Throttle.png',                'Sim Throttle.png',                  'CombinedVert Throttle.png';
+    'beta100_throttle.png',                'beta060_throttle.png',                  'didoVsSimThrottleComparison.png';
 };
 
 for i = 1:size(pairs, 1)

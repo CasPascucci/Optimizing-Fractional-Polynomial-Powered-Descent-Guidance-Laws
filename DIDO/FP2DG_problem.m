@@ -3,7 +3,7 @@ addpath([pwd, '/../CoordinateFunctions']);
 addpath([pwd, '/../']);
 
 %% 1. Mission Parameters (identical to userTest.m)
-beta = 1.0; % 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 0.96; % 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
 PDIState = struct('altitude', 15240, ...       % m
                   'lonInitDeg', 41.85, ...     % deg
@@ -170,7 +170,7 @@ landingError = norm(finalPosENU);
 
 %% 10. Results Summary
 fprintf('\n--- DIDO Results ---\n');
-fprintf('Cost:            %.2f\n', cost);
+fprintf('Cost:            %.4f\n', cost);
 fprintf('Time of Flight:  %.2f sec (%.4f ND)\n', t_dim(end) - t_dim(1), t_DIDO(end) - t_DIDO(1));
 fprintf('Fuel Used:       %.2f kg\n', fuelCost);
 fprintf('Final Mass:      %.2f kg\n', m_dim(end));
@@ -207,10 +207,11 @@ fprintf('  ODE45 fuel used: %.2f kg\n', M_ref - m_prop_final);
 %% 13. Plots
 figure('Name', 'DIDO Throttle Profile'); hold on; grid on;
 plot(t_dim, throttle, 'b-', 'LineWidth', 2, 'DisplayName', 'DIDO Optimal Throttle');
-yline(1.0, 'k-', 'LineWidth', 1, 'DisplayName', 'Max Thrust');
-yline(vehicleParams.minThrust/vehicleParams.maxThrust, 'k-', 'LineWidth', 1, 'DisplayName', 'Min Thrust');
+yline(1.0, 'k--', 'LineWidth', 1, 'DisplayName', 'Max Throttle');
+yline(vehicleParams.minThrust/vehicleParams.maxThrust, 'k--', 'LineWidth', 1, 'DisplayName', 'Min Throttle');
 xlabel('Time (s)'); ylabel('Throttle Fraction');
 title('DIDO Optimal Throttle Profile');
+ylim([0, 1.2]);
 legend('Location', 'best');
 set(gca, 'FontSize', 20);
 

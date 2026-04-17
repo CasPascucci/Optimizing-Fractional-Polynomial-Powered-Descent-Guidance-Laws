@@ -3,7 +3,7 @@ clear all;  clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 0.9;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 0.7;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
 % First IC set is for everything but GS
 paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional seconds)
@@ -11,7 +11,7 @@ paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, 
 
 glideSlopeEnabled = false;
 pointingEnabled = false;
-reOptimizationEnabled = false;
+reOptimizationEnabled = true;
 divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
 
 %% 1. Initial State Definitions
@@ -61,7 +61,7 @@ optimizationParams.minPointing     = 10; % deg
 
 % Re-Optimization Settings
 optimizationParams.updateOpt  = reOptimizationEnabled; 
-optimizationParams.updateFreq = 30;   % s
+optimizationParams.updateFreq = 5;   % s
 optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
 
 % Tolerances
@@ -134,15 +134,16 @@ fprintf('Tgo (sec):   %.2f\n', tgoOptSec);
 fprintf('Cost Value:  %.4f\n', optTable(3));
 fprintf('Opt Fuel:    %.2f kg\n', optFuelCost);
 fprintf('Sim Fuel:    %.2f kg\n', simFuelCost);
+if exist("simTable","var") && ~isempty(simTable)
+    fprintf('Sim Cost J:  %.4f\n', simTable(3));
+end
 if exist("optTable","var")
     table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost", "Cost Function"]);
 end
 
 %% 5. Single Segment Re-Run
 % Use this block to isolate and troubleshoot specific re-optimization segments
-if optimizationParams.updateOpt
+% if optimizationParams.updateOpt
     % segmentIdx = 63;
     % outputSingle = reOptReRun(segmentIdx, ICstates, optHistory, beta, ...
-    %     problemParams, nonDimParams, optimizationParams, refVals, ...
-    %     targetState.delta_t / refVals.T_ref, verboseOutput);
-end
+    %     problemP

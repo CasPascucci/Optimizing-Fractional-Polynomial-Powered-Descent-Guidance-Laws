@@ -2,7 +2,7 @@ clear all; clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-betaVec = 0.95;
+betaVec = 0.94;
 %betaVec = 1.0:-0.05:0.0
 
 paramsIC = [0.3, 0.4, 700]; % Good for everything but GS

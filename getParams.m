@@ -233,7 +233,5 @@ if runSimulation
     simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,false);
     simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
     simTable = [simErrorNorm; simFuelCost; simCost];
-else
-    simTable = [inf;inf];
 end
 end
