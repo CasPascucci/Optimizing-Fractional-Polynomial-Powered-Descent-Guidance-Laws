@@ -2,10 +2,10 @@ clear all; clc; close all;
 addpath([pwd, '/CoordinateFunctions']);
 
 % Key Parameters
-fixedTgo = 650;
-gammaRange = [0.01, 1.4];
-betaVal = 0.92;
-gridResolution = 100;
+fixedTgo = 761.65;
+gammaRange = [0.01, 1.0];
+betaVal = 0;
+gridResolution = 1000;
 
 glideSlopeEnabled = false; % keep all of these flags false here, constraints aren't used in these tests
 pointingEnabled = false;
@@ -102,16 +102,18 @@ if maxConstraints >= 2
 end
 
 maxCost = max(costGammaSweep, [], 'all', 'omitnan');
-minCost = min(costGammaSweep, [], 'all', 'omitnan');
-validMask = ~isnan(costGammaSweep);
-if any(validMask, 'all')
-    [minRow, minCol] = find(costGammaSweep == minCost, 1);
+feasibleMask = ~isnan(costGammaSweep) & (activeGammaSweep <= 1);
+feasibleCost = costGammaSweep;
+feasibleCost(~feasibleMask) = NaN;
+minCost = min(feasibleCost, [], 'all', 'omitnan');
+if any(feasibleMask, 'all')
+    [minRow, minCol] = find(feasibleCost == minCost, 1);
     [maxRow, maxCol] = find(costGammaSweep == maxCost, 1);
     bestG1min = G1(minRow, minCol);
     bestG2min = G2(minRow, minCol);
     bestG1max = G1(maxRow, maxCol);
     bestG2max = G2(maxRow, maxCol);
-    fprintf("Min cost of %.1f @ G1=%.2f, G2=%.2f\n", minCost, bestG1min, bestG2min);
+    fprintf("Min feasible cost of %.1f @ G1=%.2f, G2=%.2f\n", minCost, bestG1min, bestG2min);
     fprintf("Max cost of %.1f @ G1=%.2f, G2=%.2f\n", maxCost, bestG1max, bestG2max);
 else
     fprintf("No valid solutions found.\n");
@@ -122,28 +124,40 @@ if ~exist(folderName,"dir")
     mkdir(folderName);
 end
 
-% Figure 1: Fuel Contour
-f1 = figure('Name','Fuel Consumption Sensitivity to Gamma'); hold on;
-surf(G1, G2, costGammaSweep);
-axis equal;
-plot3(bestG1min,bestG2min,minCost,'.r','MarkerSize',20)
-xlabel('$\gamma_1$','Interpreter','latex'); 
-ylabel('$\gamma_2$','Interpreter','latex');
-title('Fuel Consumption Sensitivity to Gamma','Interpreter','latex');
-subtitle(sprintf("$t_{go}$ = %d s", round(fixedTgo)), 'Interpreter','latex');
+% Figure 1: Cost Contour (replace surf with contourf)
+f1 = figure('Name','Cost Sensitivity to Gamma'); hold on;
+contourf(G1, G2, costGammaSweep, 30, 'LineColor', 'none','DisplayName','');
+cb = colorbar;
+cb.Label.String = 'Cost $J$';
+cb.Label.Interpreter = 'latex';
+% Draw the gamma2 = gamma1 constraint boundary
+diagLine = linspace(gammaRange(1), gammaRange(2), 200);
+plot(diagLine, diagLine, 'w--', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+% Mark the minimum
+hMin = plot(bestG1min, bestG2min, 'r*', 'MarkerSize', 14, 'LineWidth', 2);
+legend(hMin, 'Minimum', 'Interpreter', 'latex', 'Location', 'northwest');
+xlabel('$\gamma_1$', 'Interpreter', 'latex');
+ylabel('$\gamma_2$', 'Interpreter', 'latex');
+title('Cost Sensitivity to $[\gamma_1, \gamma_2]$', 'Interpreter', 'latex');
+subtitle(sprintf('$\\beta$ = %.2f, $t_{go}$ = %.2f s', betaVal, fixedTgo), 'Interpreter', 'latex');
 set(gca, 'FontSize', 20);
-saveas(f1, fullfile(folderName, 'Fuel_Contour.png'));
-saveas(f1, fullfile(folderName, 'Fuel_Contour.fig'));
+saveas(f1, fullfile(folderName, 'Cost_Contour.png'));
+saveas(f1, fullfile(folderName, 'Cost_Contour.fig'));
 
-
-% Figure 2: Constraints Surface
+% Figure 2: Active Constraints (discrete colormap)
 f2 = figure('Name','Active Constraints Map'); hold on;
-surf(G1, G2, activeGammaSweep); view(0, 90); colorbar; shading interp;
-axis equal;
-xlabel('$\gamma_1$','Interpreter','latex'); 
-ylabel('$\gamma_2$','Interpreter','latex');
-title('Active Constraints Map','Interpreter','latex');
-subtitle(sprintf("$t_{go}$ = %d s", round(fixedTgo)), 'Interpreter','latex');
+pcolor(G1, G2, activeGammaSweep); shading flat;
+colormap(f2, [0.2 0.6 0.2; 1 0.8 0; 0.8 0.1 0.1]);  % green/yellow/red for 0/1/2+
+caxis([0, 2]);  % pin limits so 0 always maps to green regardless of data range
+cb2 = colorbar('Ticks', [0, 1, 2], 'TickLabels', {'0', '1', '2+'});
+cb2.Label.String = 'Active Thrust Constraints';
+plot(diagLine, diagLine, 'w--', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+hMin2 = plot(bestG1min, bestG2min, 'b*', 'MarkerSize', 14, 'LineWidth', 2);
+legend(hMin2, 'Minimum', 'Interpreter', 'latex', 'Location', 'northwest');
+xlabel('$\gamma_1$', 'Interpreter', 'latex');
+ylabel('$\gamma_2$', 'Interpreter', 'latex');
+title('Active Thrust Constraints', 'Interpreter', 'latex');
+subtitle(sprintf('$t_{go}$ = %d s', round(fixedTgo)), 'Interpreter', 'latex');
 set(gca, 'FontSize', 20);
 saveas(f2, fullfile(folderName, 'Constraints_Map.png'));
 saveas(f2, fullfile(folderName, 'Constraints_Map.fig'));
@@ -166,17 +180,17 @@ function [cost, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, betaVal, non
     tgospan = linspace(0, tgoND, nodeCount);
     aT = nonDim.afStarND + c1.*(tgospan.^gamma1) + c2.*(tgospan.^gamma2);
     aTmag = vecnorm(aT, 2, 1);
-    
+
     Q = cumtrapz(tgospan, aTmag ./ nonDim.ispND);
     Q = Q(end) - Q;
     simpson1 = simpsonComp13Integral(tgospan,aTmag);
     simpson2 = simpsonComp13Integral(tgospan,dot(aT,aT));
     cost = betaVal*simpson1 + (1-betaVal)*simpson2;
-    
+
     mCurrent = nonDim.m0ND * exp(-Q);
-    thrustMag = mCurrent .* aTmag; 
-    
+    thrustMag = mCurrent .* aTmag;
+
     tol = 1e-4;
     activeNodes = sum((thrustMag - nonDim.maxThrustND) > tol) + sum((nonDim.minThrustND - thrustMag) > tol);
     activeCount = activeNodes;
-end
+end    

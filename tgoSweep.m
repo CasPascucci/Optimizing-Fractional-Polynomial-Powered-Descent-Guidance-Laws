@@ -4,9 +4,9 @@ addpath([pwd, '/CoordinateFunctions']);
 
 % Key Parameters 
 fixedGamma1 = 0.01;
-fixedGamma2 = 0.8872;
-tgoRange = [570,800];
-betaVal = 0.6;
+fixedGamma2 = 1.0033;
+tgoRange = [566.7, 780];
+betaVal = 0.0;
 % IF console prints message stating that too many constraints are active,
 % adjust tgoRange to a safer region, constraints at beginning of
 % activeTgoSweep mean the range should be moved to higher values, and vice
@@ -75,7 +75,7 @@ nonDim = struct('r0ND',r0Dim/L_ref, ...
 
 fprintf('Tgo Sweep, Fixed Params: G1=%.2f, G2=%.2f\n', fixedGamma1, fixedGamma2);
 
-numPoints = 100;
+numPoints = 1000;
 
 tgoVec = linspace(tgoRange(1),tgoRange(2),numPoints);
 costTgoSweep = zeros(numPoints,1);
@@ -114,9 +114,11 @@ end
 
 f1 = figure('Name','Cost Function Sensitivty to Tgo Sweep'); hold on;
 plot(tgoVec, costTgoSweep, 'b-', 'LineWidth',2);
+hMin = plot(minCostTime, minCost, 'r*', 'MarkerSize', 14, 'LineWidth', 2);
+legend(hMin, sprintf('Minimum ($t_{go}$ = %.1f s)', minCostTime), 'Interpreter', 'latex', 'Location', 'northeast');
 xlabel('Time of Flight of Trajectory'); ylabel('Cost Function Evaluation of Trajectory');
 title('Cost Function Sensitivty to $t_{go}$ Sweep','Interpreter','latex');
-subtitle(sprintf("$\\gamma_1$ = %.4f, $\\gamma_2$ = %.4f", fixedGamma1, fixedGamma2), 'Interpreter','latex');
+subtitle(sprintf("$\\beta$ = %.2f, $\\gamma_1$ = %.4f, $\\gamma_2$ = %.4f", betaVal, fixedGamma1, fixedGamma2), 'Interpreter','latex');
 set(gca, 'FontSize', 20);
 
 

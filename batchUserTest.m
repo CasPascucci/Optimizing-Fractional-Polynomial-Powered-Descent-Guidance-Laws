@@ -2,7 +2,7 @@ clear all; clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-betaVec = 0.94;
+betaVec = [1 1 1];
 %betaVec = 1.0:-0.05:0.0
 
 paramsIC = [0.3, 0.4, 700]; % Good for everything but GS
@@ -10,7 +10,7 @@ paramsIC = [0.3, 0.4, 700]; % Good for everything but GS
 
 glideSlopeEnabled    = false;
 pointingEnabled      = false;
-reOptimizationEnabled = true;
+reOptimizationEnabled = false;
 divertEnabled        = false;
 
 %% 1. Initial State Definitions

@@ -1,7 +1,8 @@
-folder = 'Thesis Figures/DIDO Comparisons';
+folder = 'Thesis Figures/ParamSens';
 
 pairs = {
-    'beta100_throttle.png',                'beta060_throttle.png',                  'didoVsSimThrottleComparison.png';
+    'gamma_b100.png',                'gamma_b100_constraints.png',                  ['gamma_b100_combined' ...
+    '.png'];
 };
 
 for i = 1:size(pairs, 1)

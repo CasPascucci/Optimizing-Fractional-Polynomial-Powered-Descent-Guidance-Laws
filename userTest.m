@@ -3,7 +3,7 @@ clear all;  clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 0.7;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
 
 % First IC set is for everything but GS
 paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional seconds)
@@ -11,7 +11,7 @@ paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, 
 
 glideSlopeEnabled = false;
 pointingEnabled = false;
-reOptimizationEnabled = true;
+reOptimizationEnabled = false;
 divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
 
 %% 1. Initial State Definitions
