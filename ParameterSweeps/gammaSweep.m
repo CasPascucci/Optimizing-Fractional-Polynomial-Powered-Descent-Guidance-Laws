@@ -1,5 +1,6 @@
 clear all; clc; close all;
-addpath([pwd, '/CoordinateFunctions']);
+addpath(fileparts(mfilename('fullpath')) + "\..");
+addpath(fullfile(fileparts(mfilename('fullpath')), '..', 'CoordinateFunctions'));
 
 % Key Parameters
 fixedTgo = 761.65;
@@ -119,10 +120,7 @@ else
     fprintf("No valid solutions found.\n");
 end
 
-folderName = sprintf('Gamma Sweep/Tgo_%d', round(fixedTgo));
-if ~exist(folderName,"dir")
-    mkdir(folderName);
-end
+% 
 
 % Figure 1: Cost Contour (replace surf with contourf)
 f1 = figure('Name','Cost Sensitivity to Gamma'); hold on;
@@ -141,8 +139,8 @@ ylabel('$\gamma_2$', 'Interpreter', 'latex');
 title('Cost Sensitivity to $[\gamma_1, \gamma_2]$', 'Interpreter', 'latex');
 subtitle(sprintf('$\\beta$ = %.2f, $t_{go}$ = %.2f s', betaVal, fixedTgo), 'Interpreter', 'latex');
 set(gca, 'FontSize', 20);
-saveas(f1, fullfile(folderName, 'Cost_Contour.png'));
-saveas(f1, fullfile(folderName, 'Cost_Contour.fig'));
+% saveas(f1, fullfile(folderName, 'Cost_Contour.png'));
+% saveas(f1, fullfile(folderName, 'Cost_Contour.fig'));
 
 % Figure 2: Active Constraints (discrete colormap)
 f2 = figure('Name','Active Constraints Map'); hold on;
@@ -159,16 +157,21 @@ ylabel('$\gamma_2$', 'Interpreter', 'latex');
 title('Active Thrust Constraints', 'Interpreter', 'latex');
 subtitle(sprintf('$t_{go}$ = %d s', round(fixedTgo)), 'Interpreter', 'latex');
 set(gca, 'FontSize', 20);
-saveas(f2, fullfile(folderName, 'Constraints_Map.png'));
-saveas(f2, fullfile(folderName, 'Constraints_Map.fig'));
+% saveas(f2, fullfile(folderName, 'Constraints_Map.png'));
+% saveas(f2, fullfile(folderName, 'Constraints_Map.fig'));
 
 
 
 T_Gamma = table(G1(:), G2(:), costGammaSweep(:), activeGammaSweep(:), ...
     'VariableNames', {'Gamma1', 'Gamma2', 'FuelCost_kg', 'ActiveConstraints'});
-writetable(T_Gamma, fullfile(folderName, 'Gamma_Sweep_Data.csv'));
 
-fprintf('Results saved to: %s\n', folderName);
+% folderName = sprintf('Gamma Sweep/Tgo_%d', round(fixedTgo));
+% if ~exist(folderName,"dir")
+%     mkdir(folderName);
+% end
+% writetable(T_Gamma, fullfile(folderName, 'Gamma_Sweep_Data.csv'));
+% 
+% fprintf('Results saved to: %s\n', folderName);
 %% Functions
 function [cost, activeCount] = evaluateTraj(gamma1, gamma2, tgoSec, betaVal, nonDim, refVals, nodeCount)
     tgoND = tgoSec / refVals.T_ref;

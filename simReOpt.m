@@ -421,8 +421,8 @@ function dXdt = trajectorySegmentODE(t, X, t_reopt_start, gamma, kr, tgo_at_reop
     tgo = tgo_at_reopt - t_since_reopt;
     
     % Ensure tgo doesn't go negative
-    if tgo < 0.001
-        tgo = 0.001;
+    if tgo < 0.0001
+        tgo = 0.0001;
     end
     
     % Gravitational acceleration

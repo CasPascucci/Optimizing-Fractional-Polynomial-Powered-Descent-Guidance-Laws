@@ -1,12 +1,13 @@
 clear all; clc; close all;
-addpath([pwd, '/CoordinateFunctions']);
+addpath(fileparts(mfilename('fullpath')) + "\..");
+addpath(fullfile(fileparts(mfilename('fullpath')), '..', 'CoordinateFunctions'));
 
 
 % Key Parameters 
 fixedGamma1 = 0.01;
-gamma2Range = [0.7872,0.9872];
-fixedtgo = 699.49;
-betaVal = 0.6;
+fixedGamma2 = 1.0033;
+tgoRange = [566.7, 780];
+betaVal = 0.0;
 % IF console prints message stating that too many constraints are active,
 % adjust tgoRange to a safer region, constraints at beginning of
 % activeTgoSweep mean the range should be moved to higher values, and vice
@@ -73,51 +74,53 @@ nonDim = struct('r0ND',r0Dim/L_ref, ...
                 'maxThrustND',vehicleParams.maxThrust / (vehicleParams.massInit * refVals.A_ref), ...
                 'minThrustND',vehicleParams.minThrust / (vehicleParams.massInit * refVals.A_ref));
 
-fprintf('Gamma2 Sweep, Fixed Params: G1=%.2f, Tgo=%.2f\n', fixedGamma1, fixedtgo);
+fprintf('Tgo Sweep, Fixed Params: G1=%.2f, G2=%.2f\n', fixedGamma1, fixedGamma2);
 
-numPoints = 100;
+numPoints = 1000;
 
-gamma2Vec = linspace(gamma2Range(1),gamma2Range(2),numPoints);
-costGamma2Sweep = zeros(numPoints,1);
-activeGamma2Sweep = zeros(numPoints,1);
+tgoVec = linspace(tgoRange(1),tgoRange(2),numPoints);
+costTgoSweep = zeros(numPoints,1);
+activeTgoSweep = zeros(numPoints,1);
 
 for idx = 1: numPoints
-    [cost, nActive] = evaluateTraj(fixedGamma1,gamma2Vec(idx), fixedtgo, betaVal, nonDim, refVals, nodeCount);
-    costGamma2Sweep(idx) = cost;
-    activeGamma2Sweep(idx) = nActive;
+    [cost, nActive] = evaluateTraj(fixedGamma1,fixedGamma2, tgoVec(idx), betaVal, nonDim, refVals, nodeCount);
+    costTgoSweep(idx) = cost;
+    activeTgoSweep(idx) = nActive;
 end
 
 % Check if all tests are within constraints
-maxConstraints = max(activeGamma2Sweep, [], 'all', 'omitnan');
+maxConstraints = max(activeTgoSweep, [], 'all', 'omitnan');
 if maxConstraints >= 2
     fprintf("Thrust Saturated at more than one point on at least one trajectory\n")
 end
 
 % Find max and minimum fuel, and slope approximation between them
-[maxCost, maxCostIdx] = max(costGamma2Sweep);
-[minCost, minCostIdx] = min(costGamma2Sweep);
-maxCostGamma2 = gamma2Vec(maxCostIdx);
-minCostGamma2 = gamma2Vec(minCostIdx);
-fprintf("Max cost of %.3f @ gamma2 = %.4f\n", maxCost, maxCostGamma2);
-fprintf("Min cost of %.3f @ gamma2 = %.4f\n", minCost, minCostGamma2);
+[maxCost, maxCostIdx] = max(costTgoSweep);
+[minCost, minCostIdx] = min(costTgoSweep);
+maxCostTime = tgoVec(maxCostIdx);
+minCostTime = tgoVec(minCostIdx);
+fprintf("Max cost of %.1f @ tgo = %.1f\n", maxCost, maxCostTime);
+fprintf("Min cost of %.1f @ tgo = %.1f\n", minCost, minCostTime);
 
 % Approximate as a quadratic
-coeffs = polyfit(gamma2Vec, costGamma2Sweep, 2);
+coeffs = polyfit(tgoVec, costTgoSweep, 2);
 fprintf("Approx quadratic: %.4fx^2 + %.4fx + %.2f\n", coeffs);
-fprintf("Approx slope: %.4f\n", (maxCost-minCost)/(maxCostGamma2-minCostGamma2));
+fprintf("Approx slope: %.4f\n", (maxCost-minCost)/(maxCostTime-minCostTime));
 
 %% Saving
-folderName = sprintf('Gamma2 Sweep/G1_%.2f_TGO_%.2f', fixedGamma1, fixedtgo);
-if ~exist(folderName,"dir")
-    mkdir(folderName);
-end
-
-f1 = figure('Name','Cost Function Sensitivty to Gamma2 Sweep'); hold on;
-plot(gamma2Vec, costGamma2Sweep, 'b-', 'LineWidth',2);
-xlabel('$\gamma_2$ Value of Trajectory','Interpreter','latex'); ylabel('Cost Function Evaluation of Trajectory');
-title('Cost Function Sensitivty to $\gamma_{2}$ Sweep','Interpreter','latex');
-subtitle(sprintf("$\\gamma_1$ = %.4f, $t_{go}$ = %.4f", fixedGamma1, fixedtgo), 'Interpreter','latex');
-set(gca, 'FontSize', 20);
+% folderName = sprintf('Tgo Sweep/G1_%.2f_G2_%.2f', fixedGamma1, fixedGamma2);
+% if ~exist(folderName,"dir")
+%     mkdir(folderName);
+% end
+% 
+% f1 = figure('Name','Cost Function Sensitivty to Tgo Sweep'); hold on;
+% plot(tgoVec, costTgoSweep, 'b-', 'LineWidth',2);
+% hMin = plot(minCostTime, minCost, 'r*', 'MarkerSize', 14, 'LineWidth', 2);
+% legend(hMin, sprintf('Minimum ($t_{go}$ = %.1f s)', minCostTime), 'Interpreter', 'latex', 'Location', 'northeast');
+% xlabel('Time of Flight of Trajectory'); ylabel('Cost Function Evaluation of Trajectory');
+% title('Cost Function Sensitivty to $t_{go}$ Sweep','Interpreter','latex');
+% subtitle(sprintf("$\\beta$ = %.2f, $\\gamma_1$ = %.4f, $\\gamma_2$ = %.4f", betaVal, fixedGamma1, fixedGamma2), 'Interpreter','latex');
+% set(gca, 'FontSize', 20);
 
 
 

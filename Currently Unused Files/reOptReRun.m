@@ -51,7 +51,7 @@ function outputSingle = reOptReRun(idx, ICStates, optHistory, betaParam, problem
        phi2bar = (tgospan.^(gamma2+1))./(gamma2+1);
        
        rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospan + 0.5*(gGuidance+afStar).*tgospan.^2;
-       vdOptim = vfStar + c1*phi1bar + c2*phi2bar -(gGuidance+afStar).*tgospan;
+       vdOptim = vfStar - c1*phi1bar - c2*phi2bar -(gGuidance+afStar).*tgospan;
        aTOptim = afStar + c1*tgospan.^gamma + c2*tgospan.^gamma2;
        
        % Reconstruct Mass Plan

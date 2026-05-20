@@ -1,5 +1,6 @@
 clear all; clc; %close all;
-addpath([pwd, '/CoordinateFunctions']);
+addpath(fileparts(mfilename('fullpath')) + "\..");
+addpath(fullfile(fileparts(mfilename('fullpath')), '..', 'CoordinateFunctions'));
 PDINom = struct;
 PDINom.altitude           = 15240;
 PDINom.lonInitDeg         = 41.85;
@@ -28,7 +29,7 @@ targetState.vfLanding = [0;0;-1];
 targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
 targetState.divertEnabled = false; % No divert in dispersion test
 targetState.altDivert = 0;
-targetState.divertPoints = 0;
+targetState.divertPoints = zeros(1,3);
 
 targetState.delta_t   = 5; % seconds dim, for btt, not implemented
 
@@ -59,30 +60,65 @@ verboseOutput = false;
 
 %% Setup Stats 3 Sigma Ranges
 seedDir = fileparts(mfilename("fullpath"));
-seedFilenames = fullfile(seedDir,'Seeds/accel_seeds.dat');
-accel_seeds =load(seedFilenames);
+seedFilenames = struct( ...
+    'alt', fullfile(seedDir,'Seeds/alt_seeds.dat'), ...
+    'lon', fullfile(seedDir,'Seeds/lon_seeds.dat'), ...
+    'lat', fullfile(seedDir,'Seeds/lat_seeds.dat'), ...
+    'v', fullfile(seedDir,'Seeds/V_seeds.dat'), ...
+    'fpa', fullfile(seedDir,'Seeds/fpa_seeds.dat'), ...
+    'azmth', fullfile(seedDir,'Seeds/azmth_seeds.dat'), ...
+    'mass', fullfile(seedDir,'Seeds/mass_seeds.dat'));
+
+seeds = struct(...
+    'alt_seeds', load(seedFilenames.alt),...
+    'lon_seeds', load(seedFilenames.lon),...
+    'lat_seeds', load(seedFilenames.lat),...
+    'v_seeds', load(seedFilenames.v),...
+    'fpa_seeds', load(seedFilenames.fpa),...
+    'azmth_seeds', load(seedFilenames.azmth),...
+    'mass_seeds', load(seedFilenames.mass));
 
 % 3-sigma ranges
-accel_monte_carlo = 0.10; % percent accel
+r_disp = 200; % m
+lon_disp = 0.25; % deg
+lat_disp = 0.25; % deg
+v_disp = 3; % m/s
+fpa_disp = 0.1; % deg
+azmth_disp = 0.2; % deg
+mass_disp = 0.0066; % fraction of nominal mass
 
-
-caseCount = numel(accel_seeds);
-[queue, done] = waitBarQueue(caseCount, 'Acceleration Monte Carlo');
+caseCount = numel(seeds.alt_seeds);
+[queue, done] = waitBarQueue(caseCount, 'Dispersion');
 Results = struct('k',{},'gamma',{},'gamma2',{},'kr',{},'tgo',{},'fuel_opt',{},'fuel_sim',{},...
-    'final_error',{},'coeff1',{},'coeff2',{},'coeff3',{},'coeff4',{},'exit_ok',{},'msg',{}, 'exitflag',{}, 'accel_scale',{});
+    'final_error',{},'coeff1',{},'coeff2',{},'coeff3',{},'coeff4',{},'exit_ok',{},'msg',{}, 'exitflag',{});
 
 L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
 %% Stats Loop - Requires Parallel Computing Toolbox
 parfor (idx = 1:caseCount)
     try
-        accel_scale = accel_seeds(idx);
+        dalt = seeds.alt_seeds(idx) * (r_disp / 3);
+        dlon = seeds.lon_seeds(idx) * (lon_disp / 3);
+        dlat = seeds.lat_seeds(idx) * (lat_disp / 3);
+        dv = seeds.v_seeds(idx) * (v_disp / 3);
+        dfpa = seeds.fpa_seeds(idx) * (fpa_disp / 3);
+        dazmth = seeds.azmth_seeds(idx) * (azmth_disp / 3);
+        mass_mult = seeds.mass_seeds(idx) * (mass_disp / 3);
 
         PDI = PDINom;
+        PDI.altitude_km = PDINom.altitude / 1000 + dalt/1000;
+        PDI.lonInitDeg = PDINom.lonInitDeg + dlon;
+        PDI.latInitDeg = PDINom.latInitDeg + dlat;
+        PDI.inertialVelocity = PDINom.inertialVelocity + dv;
+        PDI.flightPathAngleDeg = PDINom.flightPathAngleDeg + dfpa;
+        PDI.azimuth = PDINom.azimuth + dazmth;
+
         vehicle = vehicleNom;
+        vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
+        vehicle.dryMass = vehicle.massInit - 8248; % this way makes the dry mass variable but fuel amount constant
 
 
-        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, betaParam, doPlotting, verboseOutput, true, runSimulation, accel_scale);
+        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, betaParam, doPlotting, verboseOutput, true, runSimulation);
         
         Results(idx).k = idx;
         Results(idx).gamma = gammaOpt;
@@ -90,8 +126,8 @@ parfor (idx = 1:caseCount)
         Results(idx).kr = krOpt;
         Results(idx).tgo = tgoOpt;
         Results(idx).fuel_opt = optFuel;
-        Results(idx).fuel_sim = simFuel;
-        Results(idx).final_error = finalPosSim;
+        Results(idx).fuel_sim = simFuel; % New
+        Results(idx).final_error = finalPosSim; % New
         Results(idx).coeff1 = gammaOpt*(krOpt/(2*gammaOpt +4) -1);
         Results(idx).coeff2 = (gammaOpt*krOpt/(2*gammaOpt+4)-gammaOpt-1);
         Results(idx).coeff3 = ((gammaOpt+1)/tgoOpt)*(1-krOpt/(gammaOpt+2));
@@ -99,7 +135,6 @@ parfor (idx = 1:caseCount)
         Results(idx).exit_ok = true;
         Results(idx).msg = '';
         Results(idx).exitflag = exitflag;
-        Results(idx).accel_scale = accel_scale;
     catch ME
         Results(idx).k = idx;
         Results(idx).exit_ok = false;
@@ -111,7 +146,7 @@ elapsed = toc(dispTime)
 done();
 
 %% Save Results
-dispDir = 'AccelMonteCarlo301';
+dispDir = 'Dispersion301';
 if ~exist(dispDir,'dir')
     mkdir(dispDir);
 end
@@ -134,7 +169,7 @@ condTag = strjoin(condTags,'_');
 betaVal = betaParam * 100;
 suffix  = sprintf('%dbeta_%s_%s', round(betaVal), condTag, timeRun);
 
-runTitle = sprintf('Monte Carlo Study (Beta: %.2f | Constraints: %s)', betaParam, strjoin(condTags, ', '));
+runTitle = sprintf('Dispersion Study (Beta: %.2f | Constraints: %s)', betaParam, strjoin(condTags, ', '));
 runName = suffix;
 runDir  = fullfile(dispDir, runName);
 mkdir(runDir);
@@ -155,59 +190,7 @@ T = table( (1:numel(Results)).', [Results.exit_ok].',[Results.gamma].', [Results
 writetable(T, csvfile);
 
 %% Generate Stats Plots and Tables
-ok_mask = [Results.exit_ok];
-R_ok = Results(ok_mask);
-accel_scales = [R_ok.accel_scale];
-final_errors = [R_ok.final_error]; % 3 x N
-error_norms = vecnorm(final_errors, 2, 1);
-fuel_sim_vals = [R_ok.fuel_sim];
-
-% Figure 1 — Position Error Norm vs Acceleration Scale Factor
-figure('Name', 'Position Error vs Accel Scale');
-scatter(accel_scales, error_norms, 20, 'filled');
-xlabel('Acceleration Scale Factor');
-ylabel('Position Error Norm (m)');
-title(sprintf('Position Error vs Acceleration Scale Factor (\\beta = %.2f)', betaParam));
-grid on;
-set(gca, 'FontSize', 20);
-
-% Figure 2 — 2D Landing Dispersion (East vs North)
-figure('Name', '2D Landing Dispersion');
-scatter(final_errors(1,:), final_errors(2,:), 20, 'filled');
-hold on;
-sigma_E = std(final_errors(1,:));
-sigma_N = std(final_errors(2,:));
-r3sigma = 3 * max(sigma_E, sigma_N);
-theta = linspace(0, 2*pi, 200);
-plot(r3sigma*cos(theta), r3sigma*sin(theta), 'r--', 'LineWidth', 1.5);
-hold off;
-xlabel('East Error (m)');
-ylabel('North Error (m)');
-title(sprintf('Landing Dispersion (\\beta = %.2f) — 3\\sigma circle r=%.1f m', betaParam, r3sigma));
-axis equal; grid on;
-set(gca, 'FontSize', 20);
-
-% Figure 3 — Fuel Consumed vs Acceleration Scale Factor
-figure('Name', 'Fuel vs Accel Scale');
-scatter(accel_scales, fuel_sim_vals, 20, 'filled');
-xlabel('Acceleration Scale Factor');
-ylabel('Fuel Consumed (kg)');
-title(sprintf('Fuel Consumed vs Acceleration Scale Factor (\\beta = %.2f)', betaParam));
-grid on;
-set(gca, 'FontSize', 20);
-
-% Figure 4 — Position Error Component Histograms
-figure('Name', 'Position Error Histograms');
-comp_labels = {'East', 'North', 'Up'};
-for ci = 1:3
-    subplot(3,1,ci);
-    histogram(final_errors(ci,:), 30);
-    xlabel([comp_labels{ci} ' Error (m)']);
-    ylabel('Count');
-    title(sprintf('%s Position Error (\\mu=%.2f m, \\sigma=%.2f m)', comp_labels{ci}, mean(final_errors(ci,:)), std(final_errors(ci,:))));
-    grid on;
-    set(gca, 'FontSize', 20);
-end
+statsPlotting(Results, betaParam, optimizationParams); % Only plots results with flag 1 or 2
 
 
 % Stats Summary Table
@@ -297,8 +280,6 @@ SuccessTable = table( ...
 disp('Exit flag summary:'); disp(ExitFlagTable);
 disp('Success summary:');   disp(SuccessTable);
 
-%% Rerun section
-%rerunDispersionCase(1614, PDINom, planetaryParams, targetState, vehicleNom, optimizationParams, beta, seeds)
 %% Save both tables
 exitCsv   = fullfile(runDir, 'exitflag_summary.csv');
 succCsv   = fullfile(runDir, 'success_summary.csv');

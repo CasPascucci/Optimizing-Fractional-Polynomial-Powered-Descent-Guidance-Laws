@@ -1,6 +1,6 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, problemParams, nonDimParams, refVals, delta_t, monteCarloSeed)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma,gamma2,tgo0, nonDimParams, refVals, monteCarloSeed)
 
-    if nargin < 8
+    if nargin < 7
         monteCarloSeed = [];
     end
 
@@ -9,8 +9,6 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
     r0 = nonDimParams.r0ND;
     v0 = nonDimParams.v0ND;
     m0 = nonDimParams.m0ND;
-    landingLat = problemParams.landingLatDeg;
-    landingLon = problemParams.landingLonDeg;
 
     rMoonND = nonDimParams.rMoonND;
     isp = nonDimParams.ispND;
@@ -20,13 +18,12 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
     afStar = nonDimParams.afStarND;
 
     gConst = nonDimParams.gConst;
-    BTT = false;
 
 
     X0 = [r0; v0; m0];
     odeoptions = odeset('RelTol', 1e-6, 'AbsTol', 1e-6);
      [tTraj, stateTraj] = ode45(@(t, X) trajectory(t, X, gamma, kr, ...
-                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, delta_t, BTT, monteCarloSeed), [0,tgo0], X0, odeoptions);
+                          tgo0, isp, rMoonND, rfStar, vfStar, afStar,refVals.T_ref, refVals, gConst, nonDimParams.minThrustND, nonDimParams.maxThrustND, monteCarloSeed), [0,tgo0], X0, odeoptions);
 
      rState = stateTraj(:,1:3);
      vState = stateTraj(:,4:6);
@@ -38,7 +35,6 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
 
      numStates = size(rState,1);
      aTList = zeros(3,numStates);
-     aTNormList = zeros(1,numStates);
     
 
 
@@ -74,29 +70,23 @@ function [tTraj, stateTraj, aTList, flag_thrustGotLimited] = closedLoopSim(gamma
              aTi = aTList(:,idx-1);
          end
          aTList(:,idx) = aTi;
-         aTNormList(idx) = norm(aTi);
      end
 end
 
 
 %% Functions
-function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, refVals, gConst, minThrust, maxThrust, delta_t, BTT, monteCarloSeed)
+function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, afStar, T_ref, refVals, gGuidance, minThrust, maxThrust, monteCarloSeed)
     r    = X(1:3);
     v    = X(4:6);
     mass = X(7);
     tgo  = tgo0 - t;
 
     g = -(rMoonND^2) * r / (norm(r)^3);
-    gGuidance = gConst;
 
     minAccel = minThrust/mass;
     maxAccel = maxThrust/mass;
 
     persistent aT;
-    persistent rfVirtual
-    persistent vfVirtual
-    persistent afVirtual
-    persistent tgoVirt
 
     if (tgo * T_ref) > 0.2
         aT1 = gamma*(kr/(2*gamma +4) -1)*afStar;
@@ -113,7 +103,6 @@ function dXdt = trajectory(t, X, gamma, kr, tgo0, isp, rMoonND, rfStar, vfStar, 
             aT = aT / norm(aT) * minAccel;
         end
     else
-        aT=aT;
     end
 
     F_mag = norm(aT) * mass;

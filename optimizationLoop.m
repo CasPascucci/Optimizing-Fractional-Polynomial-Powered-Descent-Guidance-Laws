@@ -207,36 +207,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     c(idx:idx+nodeCount-1) = lower(:);
     idx = idx + nodeCount;
 
-    % Glideslope Constraint
-    % if glideSlopeFlag
-    %     freeGlideNodes = floor(nodeCount*0.01) + 1;
-    %     tgospanGlide = tgospan(1:nGlideCon);
-    %     phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
-    %     phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));
-    %     rdOptim = rfStar + c1*phi1hat + c2*phi2hat - vfStar.*tgospanGlide + 0.5*(gConst+afStar).*tgospanGlide.^2;
-    %     rdOptimTOPO = rot_MCMF2ENU * (rdOptim - r0_MCMF_ND);
-    %     %rdOptimTOPO = MCMF2ENU(rdOptim,problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
-    %     rUnitVec = rdOptimTOPO./vecnorm(rdOptimTOPO,2,1);
-    % 
-    % 
-    %     if norm(rdOptimTOPO(:,1)) < 1e-10
-    %         rUnitVec(:,1) = [0;0;1];
-    %     end
-    %     vertUnitVec = [0;0;1];
-    % 
-    %     rMoon = problemParams.rMoon;
-    %     rdOptimDim = rdOptim*refVals.L_ref;
-    %     alt_opt = vecnorm(rdOptimDim,2,1) - rMoon;
-    %     frac = (alt_opt - 250)/250;
-    %     frac(frac < 0) = 0;
-    %     frac(frac > 1) = 1;
-    %     theta = (frac*45) + 45;
-    %     theta(1:freeGlideNodes) = 90;
-    % 
-    %     cGlide = cosd(theta) - dot(rUnitVec, repmat(vertUnitVec, 1, nGlideCon));
-    %     c(idx:idx+nGlideCon-1) = cGlide;
-    %     idx = idx + nGlideCon;
-    % end
     if glideSlopeFlag
         nGlideCon = nodeCount;
         tgospanGlide = tgospan(1:nGlideCon);

@@ -140,10 +140,3 @@ end
 if exist("optTable","var")
     table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost", "Cost Function"]);
 end
-
-%% 5. Single Segment Re-Run
-% Use this block to isolate and troubleshoot specific re-optimization segments
-% if optimizationParams.updateOpt
-    % segmentIdx = 63;
-    % outputSingle = reOptReRun(segmentIdx, ICstates, optHistory, beta, ...
-    %     problemP

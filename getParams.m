@@ -145,7 +145,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     exitFlags = [];
     if monteCarlo
         [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
-            closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, monteCarloSeed);
+            closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, nonDimParams, refVals, monteCarloSeed);
         if ~isempty(optHistory)
             optHistory = array2table(optHistory);
             optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
@@ -158,7 +158,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         if ~reopt % If not reoptimizing call this variant
             % Static Simulation
             [tTraj, stateTraj, aTSim, flag_thrustGotLimited] = ...
-                closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND);
+                closedLoopSim(gammaOpt, gamma2Opt, tgoOpt/T_ref, nonDimParams, refVals);
             [c1_static, c2_static, c1_num, c2_num] = calculateCoeffs(nonDimParams.r0ND, nonDimParams.v0ND, optParams(3), ...
                                        gammaOpt, gamma2Opt, nonDimParams.afStarND, ...
                                        nonDimParams.rfStarND, nonDimParams.vfStarND, nonDimParams.gConst);
@@ -216,7 +216,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             traj = divertTrajectories{idx};
             plot3(traj(:,1),traj(:,2),traj(:,3))
         end
-        xlabel("X");ylabel("Y");xlabel("Z");
+        xlabel("X");ylabel("Y");zlabel("Z");
         xlim([-0.2,0.2]);ylim([-0.2,0.2]);zlim([-173.65,-173.6]);
 
         figure(); hold on;
