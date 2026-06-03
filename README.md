@@ -1,11 +1,13 @@
 # FP2DG: Fractional-Polynomial Powered Descent Guidance
 
-MATLAB implementation of the **FP2DG** algorithm for lunar powered descent guidance. The algorithm parameterizes the commanded thrust acceleration as a two-term fractional polynomial in time-to-go, then uses constrained optimization (`fmincon`, SQP) to find the best parameter triplet for a given mission.
+MATLAB code for my optimization framework for the **FP2DG** guidance law for lunar powered descent, as seen in my Master's Thesis : **"Optimizing Fractional-Polynomial Powered Descent Guidance Laws"**. FP2DG itself  is Lu's; the contribution here is selecting the FP2DG parameters by constrained optimization rather than by hand, then validating the result in closed-loop simulation.
 
-The accompanying papers describe the theory in full:
+The law parameterizes the commanded thrust acceleration as a fractional polynomial in time-to-go — a constant final-acceleration term plus two power-law terms whose (generally non-integer) exponents `gamma1`, `gamma2` are free parameters. This framework reduces the infinite-dimensional optimal-control problem to a **three-variable NLP** over `[gamma1, gamma2, tgo]`, solved with `fmincon` (SQP). Because any valid parameter set already meets the landing boundary conditions by construction, the optimizer searches purely over performance and constraint behavior.
 
-- **"Optimizing Fractional-Polynomial Powered Descent Guidance Laws"** — covers the optimization-based approach implemented here
-- **"Theory of Fractional-Polynomial Powered Descent Guidance"** — covers the analytical foundations of the guidance law family
+The accompanying documents describe the theory in full:
+
+- **"Optimizing Fractional-Polynomial Powered Descent Guidance Laws"** — M.S. thesis, Casey Pascucci, San Diego State University, 2026. Covers the optimization-based approach implemented here (NLP formulation, closed-loop and re-optimization simulation, DIDO benchmark, dispersion/Monte Carlo validation). The nominal scenario is an Apollo-11-representative lunar descent with an Apollo LEM–class vehicle.
+- **"Theory of Fractional-Polynomial Powered Descent Guidance"** — Lu, P., *Journal of Guidance, Control, and Dynamics*, Vol. 43, No. 3, 2020, pp. 398–409, doi:10.2514/1.G004556. Establishes the guidance-law family upon which this work is built.
 
 ---
 
@@ -31,38 +33,48 @@ The accompanying papers describe the theory in full:
 
 ## 1. Background: The Guidance Law
 
-FP2DG commands thrust acceleration as:
+The explicit form of FP2DG commands thrust acceleration as:
 
 ```
 a_T(t_go) = a_f* + c1 * t_go^gamma1 + c2 * t_go^gamma2
 ```
 
-where `t_go` is time-to-go (counts **down** from `tgo` to 0 at landing), `a_f*` is the desired final acceleration (typically a hover-thrust-minus-gravity value), and `gamma1`, `gamma2` are fractional exponents — the free parameters.
+where `t_go` is time-to-go (counts **down** from `tgo` to 0 at landing), `gamma1`, `gamma2` are the fractional exponents (the free shape parameters), and `a_f*` is the desired final (touchdown) thrust acceleration — the value the command converges to as `t_go -> 0`, provided `gamma1 > 0`. In the nominal lunar scenario `a_f*` is set to `2g` directed vertically upward in the ENU frame at the landing site.
 
-**Coefficients `c1`, `c2`** are solved analytically from the two terminal boundary conditions — final position `r_f` and final velocity `v_f` — by inverting a 2×2 linear system. This is handled by `calculateCoeffs.m`.
+This is the explicit form, a function of `t_go` only, independent of the in-flight state. It is used for the optimization and for all reported open-loop results.
 
-**`kr`** is a composite parameter derived from the exponents:
+**Special cases (behavioral landmarks).** Two classical laws fall out of specific exponent pairs, which is useful for sanity-checking the optimizer:
+- `gamma1, gamma2 = 0, 1` -> **E-Guidance** (linear thrust profile; independent of `a_f*`, and the law that minimizes the energy cost)
+- `gamma1, gamma2 = 1, 2` -> **Apollo PDG** (quadratic thrust profile)
+
+**Coefficients `c1`, `c2`** are solved analytically from the two terminal boundary conditions — final position `r_f` and final velocity `v_f` — as a 2×2 linear system applied independently to each spatial component. This is handled by `calculateCoeffs.m`. The determinant of that system vanishes when `gamma1 = gamma2`, which is why the optimizer enforces `gamma2 > gamma1`.
+
+**`kr`** is an alternate parameter seen in the feedback form of the guidance law:
 ```
-kr = (gamma2 + 2)(gamma1 + 2)
+kr = (gamma1 + 2)(gamma2 + 2)
 ```
-It appears directly in the **closed-loop (state-feedback) form** of the guidance law used in simulation:
+`kr` is seen in the feedback form of the guidance, presented below. `gamma1` and `gamma2` are solved for in the course of the optimization, and then during simulaiton, when the feedback form is utilized, `kr` is found using both gamma's. This change in notation is just to match the original formulations described, and an alternate form of the closed-loop feedback form of the guidance that uses `gamma1` and `gamma2` could be used instead.
 ```
 a_T = gamma1*(kr/(2*gamma1+4) - 1)*a_f*
     + (gamma1*kr/(2*gamma1+4) - gamma1 - 1)*g
     + ((gamma1+1)/t_go)*(1 - kr/(gamma1+2))*(v_f* - v)
     + (kr/t_go^2)*(r_f* - r - v*t_go)
 ```
-This tracking form feeds back the current position `r` and velocity `v`, making the guidance law robust to perturbations without needing re-optimization.
+This tracking form feeds back the current position `r` and velocity `v`, making the guidance law robust to perturbations without requiring re-optimization.
 
-**The optimization** searches over `[gamma1, gamma2, tgo]` to minimize a weighted cost:
+**The optimization** searches over `[gamma1, gamma2, tgo]` to minimize a blended fuel-and-effort cost function:
 ```
 J = beta * integral(|a_T| dt)  +  (1 - beta) * integral(|a_T|^2 dt)
+      \_______ J1 _______/        \________ J2 ________/
 ```
-- `beta = 1.0` — pure fuel-optimal (minimizes delta-V)
-- `beta = 0.0` — minimum control effort (smoothest throttle profile)
-- `0 < beta < 1` — a trade-off between the two
+- `beta = 1.0` — pure fuel-optimal: `J1` is the integral of acceleration magnitude, proportional to delta-V, and (via the rocket equation) is a direct correllary for propellant consumption.
+- `beta = 0.0` — minimum control effort: `J2` penalizes the squared acceleration, giving smoother throttle profiles (this is the cost E-Guidance is optimal for, so an unconstrained `beta = 0` solution should recover E-Guidance).
+- `0 < beta < 1` — a trade-off between the two, utilizing `J2` as a regularization term against propellant consumption.
 
-Optional constraints enforced during optimization: thrust saturation bounds, a glideslope cone, and a thrust-pointing angle limit.
+Both integrals are evaluated with composite Simpson's 1/3 rule over `nodeCount = 301` nodes. This node count can be raised for diminishing returns on accuracy, trading against solution time. Or it can be lowered, reducing accuracy for increased time performance. More reasonable scenarios that don't require the level of detail needed in this work can find confident results with ~100 or even fewer nodes.
+Node count for optimization must be kept odd, so long as the Simpson's composite 1/3 rule is used, in order to ensure an even count of intervals.
+
+Optional constraints enforced during optimization: thrust saturation bounds, a glideslope cone, and a thrust-pointing angle limit (all applied per-node) and explained in [Constraints](#12-constraints).
 
 ---
 
@@ -71,20 +83,17 @@ Optional constraints enforced during optimization: thrust saturation bounds, a g
 ```
 Thesis Repo/
 |
-|-- userTest.m                  <- Entry point: single run or beta sweep
+|-- userTest.m                  <- Primary Entry point: single run or beta sweep
 |
 |-- getParams.m                 <- Core pipeline: setup -> optimize -> simulate -> plot
-|-- getParamsDIVERT.m           <- Variant of getParams for divert scenarios
-|-- optimizationLoop.m          <- fmincon wrapper (SQP), enforces all constraints
+|-- getParamsDIVERT.m           <- Variant of getParams for bulk divert scenario testing
+|-- optimizationLoop.m          <- fmincon wrapper (SQP), handles and enforces all constraints
 |-- closedLoopSim.m             <- Static closed-loop simulation (no re-opt)
-|-- simReOpt.m                  <- Simulation with periodic re-optimization + divert
+|-- simReOpt.m                  <- Simulation with periodic re-optimization + divert capability
 |-- calculateCoeffs.m           <- Solves for guidance coefficients c1, c2
 |-- plotting.m                  <- All figures for a single run
 |-- simpsonComp13Integral.m     <- Composite Simpson 1/3 rule numerical integrator
 |-- enuBasis.m                  <- Computes ENU unit vectors at a lat/lon point
-|
-|-- comparisonFigures.m         <- Utility: merge PNGs side-by-side for thesis figures
-|-- comparisonFiguresVert.m     <- Same, vertical stacking
 |
 |-- CoordinateFunctions/
 |   |-- PDI2MCMF.m              <- PDI state (lat/lon/alt/vel/FPA/heading) -> MCMF
@@ -96,11 +105,11 @@ Thesis Repo/
 |   `-- tgoSweep.m              <- Entry point: 1D cost curve over tgo at fixed [gamma1, gamma2]
 |
 |-- Dispersion and MonteCarlo/
-|   |-- dispersionStudy.m       <- Entry point: full state dispersion study (parfor)
+|   |-- dispersionStudy.m       <- Entry point: full state dispersion study (currently uses Parallel Toolbox in `parfor`. This can be changed on just that one line to be a `for` loop, eliminating the need for an additional toolbox)
 |   |-- accelMonteCarlo.m       <- Entry point: accelerometer scale factor Monte Carlo
 |   |-- statsPlotting.m         <- Statistics plots called by dispersionStudy
 |   `-- Seeds/
-|       |-- alt_seeds.dat       <- Pre-generated standard-normal random samples
+|       |-- alt_seeds.dat       <- Pre-generated standard-normal random samples using the python seedgen script
 |       |-- lon_seeds.dat
 |       |-- lat_seeds.dat
 |       |-- V_seeds.dat
@@ -109,7 +118,7 @@ Thesis Repo/
 |       |-- mass_seeds.dat
 |       `-- accel_seeds.dat
 |
-`-- DIDO/                       <- Optional: requires DIDO Toolbox (commercial)
+`-- DIDO/                       <- Optional: requires DIDO Toolbox
     |-- FP2DG_problem.m         <- Entry point: run DIDO for comparison
     |-- FP2DG_cost.m
     |-- FP2DG_dynamics.m
@@ -121,12 +130,12 @@ Thesis Repo/
 
 ## 3. Quick Start: Running `userTest.m`
 
-`userTest.m` is the primary interactive entry point. Open it in MATLAB and run from the repo root (it uses `addpath` to find all dependencies automatically).
+`userTest.m` is the primary interactive entry point. Open it in MATLAB and run from the repo root (it uses `addpath` to find all dependencies hidden in subfolders automatically).
 
 **Step 1 — Choose a beta value (or a vector for comparison sweeps):**
 ```matlab
 betaVec = [0.7];           % single run
-% betaVec = 1.0:-0.1:0.0; % sweep beta from 1 to 0, all overlaid on same figures
+% betaVec = 1.0:-0.1:0.0; % sweep beta from 1 to 0 by 0.1, all overlaid on same figures
 ```
 
 **Step 2 — Choose which features to enable:**
@@ -137,9 +146,9 @@ reOptimizationEnabled = false;  % periodically re-optimize mid-flight
 divertEnabled         = false;  % enable target-switch divert capability
 ```
 
-> **Note:** Setting `divertEnabled = true` automatically disables glideslope and pointing constraints and enables re-optimization. The script switches to calling `getParamsDIVERT` instead of `getParams`.
+> **Note:** Setting `divertEnabled = true` automatically disables glideslope and pointing constraints and enables re-optimization. When using the divert scenario, make sure the settings for reOptimization are as desired, reOpt frequency can be set to very long timelines so that during a divert scenario, the only reOpt that occurs is at the moment of divert. The script switches to calling `getParamsDIVERT` instead of `getParams`.
 
-**Step 3 — Run.** The script prints optimization results to the console and opens figures 1–15. If running a beta sweep, all runs overlay on the same figures in different colors.
+**Step 3 — Run.** The script prints optimization results to the console and opens figures. If running a beta sweep, all runs overlay on the same figures in different colors.
 
 **Step 4 — Read the summary table.** After all beta values are run, a formatted summary table is printed to the console showing gamma1, gamma2, kr, tgo, fuel costs, simulation error, and exit flags.
 
@@ -160,7 +169,7 @@ These four structs are the primary inputs to `getParams` and appear in identical
 | `flightPathAngleDeg` | deg | Flight path angle (positive = above horizontal) |
 | `azimuth` | deg | Heading angle, clockwise from North |
 
-### `planetaryParams` — Moon parameters
+### `planetaryParams` — Target Body parameters
 
 | Field | Units | Description |
 |---|---|---|
@@ -185,8 +194,8 @@ These four structs are the primary inputs to `getParams` and appear in identical
 | `landingLonDeg` | deg | Landing site longitude |
 | `landingLatDeg` | deg | Landing site latitude |
 | `rfLanding` | m, 3x1 ENU | Final position relative to landing site (typically [0;0;0]) |
-| `vfLanding` | m/s, 3x1 ENU | Desired final velocity (typically [0;0;-1] for near-hover) |
-| `afLanding` | m/s^2, 3x1 ENU | Desired final acceleration (typically [0;0;2g] for hover) |
+| `vfLanding` | m/s, 3x1 ENU | Desired final velocity |
+| `afLanding` | m/s^2, 3x1 ENU | Desired final acceleration |
 | `divertEnabled` | bool | Enable mid-flight target switch |
 | `altDivert` | m | Altitude at which the divert event fires |
 | `divertPoints` | m, Nx3 ENU | Candidate divert target locations (East, North, Up per row) |
@@ -355,12 +364,10 @@ accel_scale = 1 + accel_scale;                              % centered at 1.0
  optTable, simTable, nActiveConstraints] = ...
     getParams(PDIState, planetaryParams, targetState, vehicleParams, ...
               optimizationParams, betaParam, doPlots, verboseOutput, ...
-              dispersion, runSimulation [, monteCarloSeed])
+              runSimulation [, monteCarloSeed])
 ```
 
-> **Note on arg 9 (`dispersion`):** This is a legacy argument retained for call-site compatibility. It has no effect on behavior and can be passed as `false`.
-
-> **Note on arg 11 (`monteCarloSeed`):** Optional. When provided, it is passed through to `closedLoopSim` as a multiplicative scalar on the commanded thrust acceleration, modeling accelerometer scale error.
+> **Note on arg 10 (`monteCarloSeed`):** Optional. When provided, it is passed through to `closedLoopSim` as a multiplicative scalar on the commanded thrust acceleration, modeling accelerometer scale error. Its presence also switches the simulation path to the Monte Carlo branch (skipping re-optimization and plotting).
 
 **What it does, step by step:**
 
@@ -413,6 +420,7 @@ Runs `fmincon` (SQP algorithm) over the decision variables `[gamma1, gamma2, tgo
   - Thrust bounds at every node: `minThrust <= m(t) * |a_T(t)| <= maxThrust` (2 * nodeCount constraints)
   - Glideslope cone at every node if enabled (nodeCount constraints)
   - Pointing angle at every node if enabled (nodeCount constraints)
+  - See more detail in [Constraints](#12-constraints)
 
 **Objective function** (from local `objectiveFunction`): evaluates the cost integral using `simpsonComp13Integral` after calling `calculateCoeffs` for the candidate `[gamma1, gamma2, tgo]`. Mass is propagated via the Tsiolkovsky rocket equation for the thrust constraints.
 
@@ -631,16 +639,15 @@ All physics inside `getParams`, `optimizationLoop`, `closedLoopSim`, and `simReO
 | Quantity | Symbol | Value | Notes |
 |---|---|---|---|
 | Length | `L_ref` | 10 000 m | Fixed |
-| Time | `T_ref` | `sqrt(L_ref / g_planet)` | ~78.6 s (lunar) |
+| Acceleration | `A_ref` | `g_planet` | Equatorial surface gravity (1.622 m/s^2, lunar) |
+| Time | `T_ref` | `sqrt(L_ref / A_ref)` | ~78.5 s (78.519 s lunar) |
 | Velocity | `V_ref` | `L_ref / T_ref` | ~127 m/s |
-| Acceleration | `A_ref` | `g_planet` | 1.622 m/s^2 |
-| Mass | `M_ref` | `massInit` | 15 103 kg |
+| Mass | `M_ref` | `massInit` | 15 103 kg (Apollo LEM–class nominal) |
 
 The non-dimensional gravity vector `gConst` is approximated as constant, evaluated at the landing site:
 ```
 gConst = -(rPlanet_ND)^2 * rfStar_ND / |rfStar_ND|^3
 ```
-This is valid for the short-duration, relatively-flat powered descent arc.
 
 The reference values are packed into the `refVals` struct and returned by `getParams`. To convert outputs back to physical units:
 
@@ -666,23 +673,23 @@ These are `2 * nodeCount` nonlinear inequality constraints in `fmincon`. The mas
 
 ### Glideslope cone (optional — `glideSlopeEnabled`)
 
-The position trajectory must lie within a cone centered on the vertical axis through the landing site. The cone half-angle varies with altitude:
+The position trajectory must lie within a cone centered on the vertical axis through the landing site. Unlike the constant-angle cone common in the literature, the half-angle here varies with altitude — this is deliberate, because a lunar descent covers ~18.5 deg of ground track and starts *below* the local horizon, which a fixed cone would immediately violate. The allowable half-angle `Theta` is:
 
-| Altitude | Half-angle |
+| Altitude | Half-angle `Theta` |
 |---|---|
-| Above `glideSlopeHigh` (500 m) | 180 deg (no constraint) |
-| Between `glideSlopeLow` and `glideSlopeHigh` | Linear interpolation |
+| Above `glideSlopeHigh` (500 m) | 180 deg — constraint effectively disabled |
+| Between `glideSlopeLow` and `glideSlopeHigh` | Linear scaling from `glideSlopeFinalTheta` up to 90 deg (a horizontal plane at `glideSlopeHigh`) |
 | Below `glideSlopeLow` (250 m) | `glideSlopeFinalTheta` (45 deg) |
 
-The bottom `freeGlideNodes` nodes are exempted to avoid numerical issues as the trajectory converges exactly to the landing site.
+So the cone is at its tightest (45 deg) near the ground, opens to horizontal (90 deg) at `glideSlopeHigh`, and is switched off above that. The bottom `freeGlideNodes` nodes are exempted to avoid numerical issues as the trajectory converges exactly to the landing site.
 
 ### Thrust pointing angle (optional — `pointingEnabled`)
 
 The angle between the thrust vector and the local vertical must not exceed a time-varying limit:
 ```
-phi(t) <= Theta(t_go) = phi_0 + 0.5 * maxTiltAccel * t_go^2
+phi(t) <= Theta(t_go) = min(180 deg, phi_0 + 0.5 * maxTiltAccel * t_go^2)
 ```
-This means: far from landing (large `t_go`), tilting is freely allowed; near landing, the vehicle must be nearly vertical. `phi_0 = minPointing` sets the minimum angle at touchdown.
+This means: far from landing (large `t_go`) the limit saturates at 180 deg, so tilting is effectively unconstrained — important here because the lunar descent starts below the local horizon; near landing, the vehicle must be nearly vertical. `phi_0 = minPointing` sets the minimum (floor) angle at touchdown.
 
 ---
 

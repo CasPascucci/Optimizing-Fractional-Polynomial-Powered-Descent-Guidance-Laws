@@ -1,7 +1,7 @@
-function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable, nActiveConstraints] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation, monteCarloSeed)
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable, nActiveConstraints] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, runSimulation, monteCarloSeed)
     
-    if nargin > 10
-        monteCarlo = true; % 11th arg in is only for Accel Monte Carlo Sim
+    if nargin > 9
+        monteCarlo = true; % 10th arg (monteCarloSeed) only used for Accel Monte Carlo Sim
     else
         monteCarlo = false;
         monteCarloSeed = [];
@@ -151,6 +151,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         end
         simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
         finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, rPlanet);
+        % Get Pseudo cost from Simulation
+        aTmagSim = vecnorm(aTSim,2,1);
+        simCost = betaParam* trapz(tTraj,aTmagSim') + (1-betaParam)*trapz(tTraj, dot(aTSim,aTSim)');
     elseif runSimulation % Only enter if simulation is required
         if ~reopt % If not reoptimizing call this variant
             % Static Simulation

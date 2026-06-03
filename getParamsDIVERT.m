@@ -1,5 +1,5 @@
 function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals] = ...
-    getParamsDIVERT(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation)
+    getParamsDIVERT(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, runSimulation)
 
     if targetState.divertEnabled % Enforce that these constraints don't apply during divert scenarios, and that reopt is enabled
         optimizationParams.glideSlopeEnabled = false;
