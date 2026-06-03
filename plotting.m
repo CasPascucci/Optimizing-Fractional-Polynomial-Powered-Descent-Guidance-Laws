@@ -69,19 +69,19 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         aTDim = aTList * A_ref;
         aTDimNorm = vecnorm(aTDim,2,1);
 
-        deltaR = MCMF2ENU(rDim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,true);
+        deltaR = MCMF2ENU(rDim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,rMoon);
         East  = deltaR(1,:)';
         North = deltaR(2,:)';
         Up    = deltaR(3,:)';
 
         alt_m = vecnorm(rDim,2,2) - rMoon;
 
-        vDimENU = MCMF2ENU(vDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+        vDimENU = MCMF2ENU(vDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,rMoon);
         vE = vDimENU(1,:)';
         vN = vDimENU(2,:)';
         vU = vDimENU(3,:)';
 
-        aTDimENU = MCMF2ENU(aTDim,problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+        aTDimENU = MCMF2ENU(aTDim,problemParams.landingLatDeg,problemParams.landingLonDeg,false,rMoon);
         aE = aTDimENU(1,:)';
         aN = aTDimENU(2,:)';
         aU = aTDimENU(3,:)';
@@ -99,7 +99,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
     vdOptim = vdOptim';
     mOptim = mOptim';
     
-    rdOptimTOPO = MCMF2ENU(rdOptim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,false);
+    rdOptimTOPO = MCMF2ENU(rdOptim',problemParams.landingLatDeg,problemParams.landingLonDeg,true,rMoon/L_ref);
     rdOptimTOPODim = rdOptimTOPO*L_ref;
 
     tgospanOpt = linspace(0,tgo0,nodeCount);
@@ -204,7 +204,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     % Figure 4: Optimization Velocity Profile
     vdOptimDim = vdOptim * V_ref;
-    vdOptimTOPO = MCMF2ENU(vdOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+    vdOptimTOPO = MCMF2ENU(vdOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,rMoon);
     figure(4); hold on; grid on;
     set(gcf, 'Name', 'Opt Vel');
     set(gca, 'FontSize', 20);
@@ -222,7 +222,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
 
     % Figure 5: Optimization TOPO Acceleration
     aTOptimDim = aTOptim * A_ref;
-    aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,true);
+    aTOptimTOPO = MCMF2ENU(aTOptimDim',problemParams.landingLatDeg,problemParams.landingLonDeg,false,rMoon);
     figure(5); hold on; grid on;
     set(gcf, 'Name', 'Opt Accel');
     set(gca, 'FontSize', 20);
@@ -237,22 +237,8 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
         yline(afStarDim, 'k--', 'LineWidth', 1, 'DisplayName', 'Desired Final Acceleration, a_f^*');
     end
     legend('Location', 'best');
-    xlabel('Time s'); ylabel('Accel m/s^2'); title('Optimization Acceleration Profile');
+    xlabel('Time s'); ylabel('Acceleration m/s^2'); title('Optimization Acceleration Profile');
     grid on;
-
-    % % Figure 6: Optimization MCMF Acceleration
-    % aTOptimDim = aTOptimDim';
-    % figure(6); hold on; grid on;
-    % set(gcf, 'Name', 'Opt Accel MCMF');
-    % 
-    % plot(tspanOpt(2:end)*T_ref, vecnorm(aTOptimDim(:,2:end),2,1), 'b-', 'LineWidth', 2, 'DisplayName', legendTag);
-    % % plot(tspanOpt(2:end)*T_ref, aTOptimDim(1,2:end), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' X']);
-    % % plot(tspanOpt(2:end)*T_ref, aTOptimDim(2,2:end), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Y']);
-    % % plot(tspanOpt(2:end)*T_ref, aTOptimDim(3,2:end), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainOpt ' Z']);
-    % 
-    % legend('Location', 'best');
-    % xlabel('Time s'); ylabel('Accel m/s^2'); title('Planned Accel Profile (MCMF)');
-    % grid on;
 
     %% Simulation Figures
     if hasSimData
@@ -346,21 +332,6 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             subtitle("Thrust is being Throttled");
         end
 
-        % % Figure 9: MCMF Acceleration
-        % figure(9); hold on; grid on;
-        % set(gcf, 'Name', 'Sim MCMF Accel');
-        % 
-        % plot(tTraj*T_ref, aTDimNorm, 'b-', 'LineWidth', 2, 'DisplayName', legendTag);
-        % % plot(tTraj*T_ref, aTDim(1,:), 'b-', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' X']);
-        % % plot(tTraj*T_ref, aTDim(2,:), 'b--', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Y']);
-        % % plot(tTraj*T_ref, aTDim(3,:), 'b:', 'LineWidth', 1.0, 'DisplayName', [labelMainSim ' Z']);
-        % 
-        % legend('Location', 'best');
-        % xlabel('Time s'); ylabel('Accel m/s^2'); title('Commanded Accel Profile (MCMF)');
-        % if flag_thrustGotLimited
-        %     subtitle("Thrust is being Throttled");
-        % end
-
         % Figure 9: Velocity Profile
         figure(9); hold on; grid on;
         set(gcf, 'Name', 'Sim Velocity');
@@ -440,15 +411,7 @@ function plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim
             xlabel('Time s'); ylabel('Degrees');
             title('Pointing Angle vs Limit');
             legend('Location','best');
-            
-            % subplot(2,1,2); hold on; grid on;
-            % plot(tspanOpt*T_ref, ThetaOpt - phiOpt, '-', 'Color', runColor, 'LineWidth', 2, 'DisplayName', legendTag);
-            % if isempty(findobj(gca, 'DisplayName', 'Zero'))
-            %      yline(0, 'k-', 'HandleVisibility', 'off');
-            % end
-            % title('Pointing margin (positive means within limit)');
-            % xlabel('Time s'); ylabel('Degrees of Margin');
-            % legend('Location','bestoutside');
+
         else
             xlabel('Time s'); ylabel('Degrees');
             title('Pointing Angle vs Limit');

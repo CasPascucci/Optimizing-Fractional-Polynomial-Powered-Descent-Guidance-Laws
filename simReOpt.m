@@ -1,6 +1,6 @@
-function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, delta_t, optimizationParams, betaParam, verboseOutput, divertPoint)
+function [tTraj, stateTraj, aTList, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = simReOpt(gamma0,gamma20,tgo0, problemParams, nonDimParams, refVals, optimizationParams, betaParam, verboseOutput, divertPoint)
 
-if nargin < 11
+if nargin < 10
     divertPoint = [];
 end
 
@@ -154,7 +154,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end
         
         ReOptTimer = tic;
         [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
-            problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
+            problemParams, newNonDimParams, optimizationParams, refVals, false);
         ReOptTime = toc(ReOptTimer);
         fprintf("ReOpt time: %.3fs\n",ReOptTime);
         if exitflag > 0
@@ -262,7 +262,7 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end
             paramsX0 = [gamma, gamma2, tgo];
     
             [optParams, ~, ~, ~, ~, ~, exitflag] = optimizationLoop(paramsX0, betaParam, ...
-                problemParams, newNonDimParams, optimizationParams, refVals, delta_t, false, false);
+                problemParams, newNonDimParams, optimizationParams, refVals, false);
     
             if exitflag > 0
                 gamma  = optParams(1);
@@ -285,6 +285,8 @@ minTime = 0.2/refVals.T_ref; % Time to stop sim at the end
             end
 
             % Integrate post-divert until the updated freeze time
+            % "2" in this section means part 2, not subscript 2, so
+            % gamma2_use is the gamma for part 2, not gamma2
             if t_freeze > t_elapsed
                 odeoptions = odeset('RelTol',1e-6,'AbsTol',1e-6);
                 t_reopt_start2 = t_elapsed;

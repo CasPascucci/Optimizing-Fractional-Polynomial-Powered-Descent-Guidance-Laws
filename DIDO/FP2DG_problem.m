@@ -56,8 +56,8 @@ landingLatDeg = targetState.landingLatDeg;
                            landingLonDeg, landingLatDeg, ...
                            inertialVelocity, flightPathAngleDeg, azimuth, rPlanet);
 
-rfDim = 10000 * ENU2MCMF(targetState.rfLanding/10000, landingLatDeg, landingLonDeg, true);
-vfDim = ENU2MCMF(targetState.vfLanding, landingLatDeg, landingLonDeg, false);
+rfDim = 10000 * ENU2MCMF(targetState.rfLanding/10000, landingLatDeg, landingLonDeg, true, rPlanet/L_ref);
+vfDim = ENU2MCMF(targetState.vfLanding, landingLatDeg, landingLonDeg, false, rPlanet/L_ref);
 
 %% 4. Non-Dimensional State Values
 rPlanetND   = rPlanet / L_ref;
@@ -160,12 +160,12 @@ throttle   = thrust_dim / vehicleParams.maxThrust;
 
 r_ENU = zeros(3, size(r_dim, 2));
 for i = 1:size(r_dim, 2)
-    r_ENU(:,i) = MCMF2ENU(r_dim(:,i), landingLatDeg, landingLonDeg, true, true);
+    r_ENU(:,i) = MCMF2ENU(r_dim(:,i), landingLatDeg, landingLonDeg, true, rPlanet);
 end
 alt_dim = vecnorm(r_dim, 2, 1) - rPlanet; % m
 
 fuelCost = (m_dim(1) - m_dim(end)); % kg
-finalPosENU = MCMF2ENU(r_dim(:,end), landingLatDeg, landingLonDeg, true, true);
+finalPosENU = MCMF2ENU(r_dim(:,end), landingLatDeg, landingLonDeg, true, rPlanet);
 landingError = norm(finalPosENU);
 
 %% 10. Results Summary
@@ -232,7 +232,7 @@ set(gca, 'FontSize', 20);
 
 v_ENU = zeros(3, size(v_dim, 2));
 for i = 1:size(v_dim, 2)
-    v_ENU(:,i) = MCMF2ENU(v_dim(:,i), landingLatDeg, landingLonDeg, false, true);
+    v_ENU(:,i) = MCMF2ENU(v_dim(:,i), landingLatDeg, landingLonDeg, false, rPlanet);
 end
 figure('Name', 'DIDO Velocity');
 plot(t_dim, v_ENU(1,:), 'r-', t_dim, v_ENU(2,:), 'g-', t_dim, v_ENU(3,:), 'b-', 'LineWidth', 2);
@@ -243,7 +243,7 @@ set(gca, 'FontSize', 20);
 
 aT_ENU = zeros(3, size(aT_dim, 2));
 for i = 1:size(aT_dim, 2)
-    aT_ENU(:,i) = MCMF2ENU(aT_dim(:,i), landingLatDeg, landingLonDeg, false, true);
+    aT_ENU(:,i) = MCMF2ENU(aT_dim(:,i), landingLatDeg, landingLonDeg, false, rPlanet);
 end
 figure('Name', 'DIDO Acceleration');
 plot(t_dim, aT_ENU(1,:), 'r-', t_dim, aT_ENU(2,:), 'g-', t_dim, aT_ENU(3,:), 'b-', 'LineWidth', 2);

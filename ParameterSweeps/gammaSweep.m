@@ -53,9 +53,9 @@ refVals = struct('L_ref', L_ref, ...
     targetState.landingLonDeg, targetState.landingLatDeg, PDIState.inertialVelocity, ...
     PDIState.flightPathAngleDeg, PDIState.azimuth*pi/180, planetaryParams.rPlanet);
 
-rfDim = refVals.L_ref * ENU2MCMF(targetState.rfLanding/10000, targetState.landingLatDeg, targetState.landingLonDeg, true);
-vfDim = ENU2MCMF(targetState.vfLanding, targetState.landingLatDeg, targetState.landingLonDeg, false);
-afDim = ENU2MCMF(targetState.afLanding, targetState.landingLatDeg, targetState.landingLonDeg, false);
+rfDim = refVals.L_ref * ENU2MCMF(targetState.rfLanding/10000, targetState.landingLatDeg, targetState.landingLonDeg, true,  planetaryParams.rPlanet/L_ref);
+vfDim = ENU2MCMF(targetState.vfLanding,                         targetState.landingLatDeg, targetState.landingLonDeg, false, planetaryParams.rPlanet/L_ref);
+afDim = ENU2MCMF(targetState.afLanding,                         targetState.landingLatDeg, targetState.landingLonDeg, false, planetaryParams.rPlanet/L_ref);
 
 rfStarND = rfDim/L_ref;
 vfStarND = vfDim/refVals.V_ref;

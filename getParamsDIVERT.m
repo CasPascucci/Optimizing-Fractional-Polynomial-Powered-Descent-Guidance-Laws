@@ -19,7 +19,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     T_ref = sqrt(L_ref/gPlanet);
     A_ref = gPlanet;
     V_ref = L_ref / T_ref;
-    M_ref = 15103.0;
+    M_ref = vehicleParams.massInit;
 
     % Extract State & Vehicle Parameters
     altitude_km        = PDIState.altitude / 1000;
@@ -34,7 +34,6 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     rfLanding          = targetState.rfLanding;
     vfLanding          = targetState.vfLanding;
     afLanding          = targetState.afLanding;
-    delta_t            = targetState.delta_t;
     divertEnabled      = targetState.divertEnabled & optimizationParams.updateOpt;
     altDivert          = targetState.altDivert;
     divertPoints       = targetState.divertPoints;
@@ -50,9 +49,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                                        landingLonDeg, landingLatDeg, ...
                                        inertialVelocity, flightPathAngleDeg, azimuth, rPlanet);
 
-    rfDim = 10000 * ENU2MCMF(rfLanding/10000, landingLatDeg, landingLonDeg, true);
-    vfDim = ENU2MCMF(vfLanding, landingLatDeg, landingLonDeg, false);
-    afDim = ENU2MCMF(afLanding, landingLatDeg, landingLonDeg, false);
+    rfDim = 10000 * ENU2MCMF(rfLanding/10000, landingLatDeg, landingLonDeg, true, rPlanet/L_ref);
+    vfDim = ENU2MCMF(vfLanding, landingLatDeg, landingLonDeg, false, rPlanet/L_ref);
+    afDim = ENU2MCMF(afLanding, landingLatDeg, landingLonDeg, false, rPlanet/L_ref);
 
     rPlanetND   = rPlanet / L_ref;
     r0ND        = r0Dim / L_ref;
@@ -66,7 +65,6 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     ispND       = isp * gEarth / (V_ref);
     maxThrustND = maxThrust / (M_ref * A_ref);
     minThrustND = minThrust / (M_ref * A_ref);
-    delta_tND   = delta_t / T_ref;
 
     %% 3. Structs Packing
     problemParams = struct;
@@ -117,11 +115,11 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     reopt = optimizationParams.updateOpt;
     fprintf("=== Starting Optimization ===\n");
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
-        optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+        optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, verboseOutput);
     if exitflag ~= 1
         fprintf("\n First Optimization Converged to flag ~=1, rerunning optimization starting from first rounds parameters:\n");
         [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag] = ...
-        optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+        optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, verboseOutput);
     end
 
     gammaOpt = optParams(1);
@@ -146,9 +144,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
 
     for idx = 1:size(problemParams.divertPoints, 1)
         divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
-        divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
+        divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true, rPlanetND);
         [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-        simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
+        simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, optimizationParams, betaParam, verboseOutput, divertPoint);
 
         divertData{idx}.tTraj = tTraj;
         divertData{idx}.stateTraj = stateTraj;
@@ -166,7 +164,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     end
     
     simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
-    finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
+    finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, rPlanet);
 
 
     %% 6. Divert Plot
@@ -195,7 +193,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                 trajENU = zeros(size(trajFiltered));
                 for i = 1:size(trajFiltered, 1)
                     rMCMF = trajFiltered(i,:)' * refVals.L_ref;
-                    rENU = MCMF2ENU(rMCMF, landingLatDeg, landingLonDeg, true, true);
+                    rENU = MCMF2ENU(rMCMF, landingLatDeg, landingLonDeg, true, rPlanet);
                     trajENU(i, :) = rENU';
                 end
                 if idx == 1
@@ -224,7 +222,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             traj = divertData{idx}.stateTraj(:,1:3) * refVals.L_ref; % Convert to dimensional (MCMF)
             % Convert final position from MCMF to ENU
             finalPosMCMF = traj(end, 1:3)';
-            finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, true);
+            finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, rPlanet);
             if idx==1
                 plot(finalPosENU(1), finalPosENU(2), 'o', 'MarkerSize', 10, ...
                 'MarkerFaceColor', colors(idx,:), 'MarkerEdgeColor', 'k', 'LineWidth', 1.5);
@@ -255,7 +253,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             traj = divertData{idx}.stateTraj(:,1:3) * refVals.L_ref; % MCMF coordinates
             % Convert from MCMF to ENU for error calculation
             finalPosMCMF = traj(end, 1:3)';
-            finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, true);
+            finalPosENU = MCMF2ENU(finalPosMCMF, landingLatDeg, landingLonDeg, true, rPlanet);
             targetPos = problemParams.divertPoints(idx, 1:2)';
             error = norm(finalPosENU(1:2) - targetPos);
             massDelta =  baseCaseMass - divertData{idx}.stateTraj(end,7)*refVals.M_ref;

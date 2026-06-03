@@ -1,5 +1,4 @@
-function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable, nActiveConstraints] = ...
-    getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation, monteCarloSeed)
+function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, simFuelCost, aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, nonDimParams, refVals, optTable, simTable, nActiveConstraints] = getParams(PDIState, planetaryParams, targetState, vehicleParams, optimizationParams, betaParam, doPlots, verboseOutput, dispersion, runSimulation, monteCarloSeed)
     
     if nargin > 10
         monteCarlo = true; % 11th arg in is only for Accel Monte Carlo Sim
@@ -34,7 +33,6 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     rfLanding          = targetState.rfLanding;
     vfLanding          = targetState.vfLanding;
     afLanding          = targetState.afLanding;
-    delta_t            = targetState.delta_t;
     divertEnabled      = targetState.divertEnabled & optimizationParams.updateOpt;
     altDivert          = targetState.altDivert;
     divertPoints       = targetState.divertPoints;
@@ -50,9 +48,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                                        landingLonDeg, landingLatDeg, ...
                                        inertialVelocity, flightPathAngleDeg, azimuth, rPlanet);
 
-    rfDim = 10000 * ENU2MCMF(rfLanding/10000, landingLatDeg, landingLonDeg, true);
-    vfDim = ENU2MCMF(vfLanding, landingLatDeg, landingLonDeg, false);
-    afDim = ENU2MCMF(afLanding, landingLatDeg, landingLonDeg, false);
+    rfDim = 10000 * ENU2MCMF(rfLanding/10000, landingLatDeg, landingLonDeg, true, rPlanet/L_ref);
+    vfDim = ENU2MCMF(vfLanding, landingLatDeg, landingLonDeg, false, rPlanet/L_ref);
+    afDim = ENU2MCMF(afLanding, landingLatDeg, landingLonDeg, false, rPlanet/L_ref);
 
     rPlanetND   = rPlanet / L_ref;
     r0ND        = r0Dim / L_ref;
@@ -66,7 +64,6 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     ispND       = isp * gEarth / (V_ref);
     maxThrustND = maxThrust / (M_ref * A_ref);
     minThrustND = minThrust / (M_ref * A_ref);
-    delta_tND   = delta_t / T_ref;
 
     %% 3. Structs Packing
     problemParams = struct;
@@ -118,13 +115,13 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     fprintf("=== Starting Optimization ===\n");
     OptTimer = tic;
     [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = ...
-        optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+        optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, verboseOutput);
     optTime = toc(OptTimer);
     fprintf("Optimization Time: %.3fs\n", optTime);
     if exitflag ~= 1
         fprintf("\n First Optimization Converged to flag ~=1, rerunning optimization starting from first rounds parameters:\n");
         [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = ...
-        optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_tND, verboseOutput, dispersion);
+        optimizationLoop(optParams, betaParam, problemParams, nonDimParams, optimizationParams, refVals, verboseOutput);
     end
 
     gammaOpt = optParams(1);
@@ -133,7 +130,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
     tgoOpt = optParams(3) * T_ref;
     optFuelCost = (mOptim(end)-mOptim(1))*M_ref;
 
-    %% 6. Simulation
+    %% 5. Simulation
     tTraj = [];
     stateTraj = [];
     aTSim = [];
@@ -153,7 +150,7 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
             ICstates.Properties.VariableNames(1:7) = {'r0_X', 'r0_Y', 'r0_Z', 'v0_X', 'v0_Y', 'v0_Z', 'm0'};
         end
         simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
-        finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
+        finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, rPlanet);
     elseif runSimulation % Only enter if simulation is required
         if ~reopt % If not reoptimizing call this variant
             % Static Simulation
@@ -164,25 +161,9 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
                                        nonDimParams.rfStarND, nonDimParams.vfStarND, nonDimParams.gConst);
             optHistory = [c1_static, c2_static, c1_num, c2_num];
         else % If reoptimizing, call this one
-            divertTrajectories = cell(1,size(problemParams.divertPoints, 1));
-            if divertEnabled % Re-Optimization with Divert, as reopt is required for divert
-                for idx = 1:size(problemParams.divertPoints, 1)
-                    divertPoint = problemParams.divertPoints(idx,:)' ./ refVals.L_ref;
-                    divertPoint = ENU2MCMF(divertPoint, landingLatDeg, landingLonDeg, true);
-                    [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-                    simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput, divertPoint);
-                    divertTrajectories{idx} = stateTraj(:,1:3);
-                end
-            else
-                % regular Re-Optimization Simulation
-                [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
-                    simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, delta_tND, optimizationParams, betaParam, verboseOutput);
-            end
-
-
-
-            
-            % Format History Output
+            % regular Re-Optimization Simulation
+            [tTraj, stateTraj, aTSim, flag_thrustGotLimited, optHistory, ICstates, exitFlags] = ...
+                simReOpt(gammaOpt, gamma2Opt, tgoOpt/T_ref, problemParams, nonDimParams, refVals, optimizationParams, betaParam, verboseOutput);
             if ~isempty(optHistory)
                 optHistory = array2table(optHistory);
                 optHistory.Properties.VariableNames(1:5) = {'t_elapsedND','gamma1','gamma2','kr','tgoND'};
@@ -192,46 +173,32 @@ function [gammaOpt, gamma2Opt, krOpt, tgoOpt, aTOptim, exitflag, optFuelCost, si
         end
         
         simFuelCost = M_ref * (stateTraj(1,7) - stateTraj(end,7));
-        finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, true);
+        finalPosSim = MCMF2ENU(stateTraj(end,1:3)' * L_ref, landingLatDeg, landingLonDeg, true, rPlanet);
+
+        % Get Pseudo cost from Simulation
+        aTmagSim = vecnorm(aTSim,2,1);
+        simCost = betaParam* trapz(tTraj,aTmagSim') + (1-betaParam)*trapz(tTraj, dot(aTSim,aTSim)');
     end
 
     if flag_thrustGotLimited
         fprintf("Simulation Trajectory Thrust Limited!\n")
     end
 
-    % Get Pseudo cost from Simulation
-    aTmagSim = vecnorm(aTSim,2,1);
-    simCost = betaParam* trapz(tTraj,aTmagSim') + (1-betaParam)*trapz(tTraj, dot(aTSim,aTSim)');
-    %% 7. Plotting
+
+    %% 6. Plotting
     if doPlots
         plotting(tTraj, stateTraj, optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, aTSim, ...
             refVals, problemParams, nonDimParams, optimizationParams, flag_thrustGotLimited, ...
             optHistory, ICstates, betaParam);
     end
 
-    %% 8. Divert Plot
-    if divertEnabled
-        figure(); hold on;
-        for idx = 1:size(problemParams.divertPoints, 1)
-            traj = divertTrajectories{idx};
-            plot3(traj(:,1),traj(:,2),traj(:,3))
-        end
-        xlabel("X");ylabel("Y");zlabel("Z");
-        xlim([-0.2,0.2]);ylim([-0.2,0.2]);zlim([-173.65,-173.6]);
 
-        figure(); hold on;
-        for idx = 1:size(problemParams.divertPoints, 1)
-            traj = divertTrajectories{idx} * refVals.L_ref;
-            plot(traj(end,1),traj(end,2),'.','MarkerSize',12);
-        end
-        xlabel("X");ylabel("Y");
+    optError = MCMF2ENU(rdOptim(:,1), landingLatDeg,landingLonDeg,true,rPlanetND);
+    optErrorNorm = norm(rfLanding*refVals.L_ref - optError*refVals.L_ref);
+    optTable = [optErrorNorm; optFuelCost; optCost];
+    if runSimulation
+        simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,rPlanetND);
+        simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
+        simTable = [simErrorNorm; simFuelCost; simCost];
     end
-optError = MCMF2ENU(rdOptim(:,1), landingLatDeg,landingLonDeg,true,false);
-optErrorNorm = norm(rfLanding*refVals.L_ref - optError*refVals.L_ref);
-optTable = [optErrorNorm; optFuelCost; optCost];
-if runSimulation
-    simError = MCMF2ENU(stateTraj(end,1:3)', landingLatDeg,landingLonDeg,true,false);
-    simErrorNorm = norm(rfLanding*refVals.L_ref - simError*refVals.L_ref);
-    simTable = [simErrorNorm; simFuelCost; simCost];
-end
 end

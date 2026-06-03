@@ -41,7 +41,6 @@ targetState = struct('landingLonDeg', 41.85, ... % deg
                      'rfLanding', [0;0;0], ...  % meters, centered at lunar radius at above landing coordinates
                      'vfLanding', [0;0;-1], ...  % m/s
                      'afLanding', [0;0;2*planetaryParams.gPlanet], ... % m/s^2
-                     'delta_t', 5, ... % seconds, not currently implemented
                      'divertEnabled', divertEnabled, ... % keep false here
                      'altDivert', 1000, ... % not used here
                      'divertPoints', [0,0,0]); % not used here
@@ -55,9 +54,9 @@ refVals = struct('L_ref', L_ref, 'T_ref', T_ref, 'A_ref', planetaryParams.gPlane
     targetState.landingLonDeg, targetState.landingLatDeg, PDIState.inertialVelocity, ...
     PDIState.flightPathAngleDeg, PDIState.azimuth*pi/180, planetaryParams.rPlanet);
 
-rfDim = refVals.L_ref * ENU2MCMF(targetState.rfLanding/10000, targetState.landingLatDeg, targetState.landingLonDeg, true);
-vfDim = ENU2MCMF(targetState.vfLanding, targetState.landingLatDeg, targetState.landingLonDeg, false);
-afDim = ENU2MCMF(targetState.afLanding, targetState.landingLatDeg, targetState.landingLonDeg, false);
+rfDim = refVals.L_ref * ENU2MCMF(targetState.rfLanding/10000, targetState.landingLatDeg, targetState.landingLonDeg, true, planetaryParams.rPlanet/L_ref);
+vfDim = ENU2MCMF(targetState.vfLanding, targetState.landingLatDeg, targetState.landingLonDeg, false, planetaryParams.rPlanet/L_ref);
+afDim = ENU2MCMF(targetState.afLanding, targetState.landingLatDeg, targetState.landingLonDeg, false, planetaryParams.rPlanet/L_ref);
 
 
 rfStarND = rfDim/L_ref;

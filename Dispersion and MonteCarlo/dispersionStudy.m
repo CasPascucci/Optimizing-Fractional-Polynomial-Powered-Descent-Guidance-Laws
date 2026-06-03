@@ -1,73 +1,73 @@
 clear all; clc; %close all;
-addpath(fileparts(mfilename('fullpath')) + "\..");
+addpath(fullfile(fileparts(mfilename('fullpath')), '..'));
 addpath(fullfile(fileparts(mfilename('fullpath')), '..', 'CoordinateFunctions'));
-PDINom = struct;
-PDINom.altitude           = 15240;
-PDINom.lonInitDeg         = 41.85;
-PDINom.latInitDeg         = -71.59;
-PDINom.inertialVelocity   = 1693.8;
-PDINom.flightPathAngleDeg = 0;
-PDINom.azimuth            = 180;
 
-planetaryParams = struct;
-planetaryParams.rPlanet = 1736.01428 * 1000; % m
-planetaryParams.gPlanet = 1.622; % m/s^2
-planetaryParams.gEarth = 9.81; % m/s^2
-
-vehicleNom = struct;
-vehicleNom.massInit = 15103.0; % kg
-vehicleNom.dryMass = vehicleNom.massInit - 8248; % kg
-vehicleNom.isp = 311; % s
-vehicleNom.maxThrust = 45000; % N
-vehicleNom.minThrust = 4500; % N
-
-targetState = struct;
-targetState.landingLonDeg      = 41.85;
-targetState.landingLatDeg      = -90.0;
-targetState.rfLanding = [0;0;0];
-targetState.vfLanding = [0;0;-1];
-targetState.afLanding = [0;0;2*planetaryParams.gPlanet];
-targetState.divertEnabled = false; % No divert in dispersion test
-targetState.altDivert = 0;
-targetState.divertPoints = zeros(1,3);
-
-targetState.delta_t   = 5; % seconds dim, for btt, not implemented
-
-optimizationParams = struct;
-optimizationParams.paramsX0 = [0.3, 0.4, 700];
-optimizationParams.nodeCount = 301; %Count must be odd for Simpson
-optimizationParams.gamma1eps = 1e-2;
-optimizationParams.gamma2eps = 1e-2;
-
-optimizationParams.glideSlopeFinalTheta = 45; %deg
-optimizationParams.glideSlopeHigh = 500; %m
-optimizationParams.glideSlopeLow = 250; %m
-optimizationParams.freeGlideNodes = 1; %m
-optimizationParams.glideSlopeEnabled = true;
-
-optimizationParams.pointingEnabled = true;
-optimizationParams.maxTiltAccel = 2; % deg/s^2
-optimizationParams.minPointing = 10; %deg, floor for pointing constraint
-
-optimizationParams.updateFreq = 10;
-optimizationParams.updateStop = 120;
-optimizationParams.updateOpt = false;
-
+%% Key Parameters
 betaParam = 0.6;
-runSimulation = true; % needs to be true
-doPlotting = false; % disable this to not plot results
+paramsIC  = [0.3, 0.4, 700];
+
+glideSlopeEnabled = false;
+pointingEnabled   = false;
+
+runSimulation = true;   % must be true for dispersion
+doPlotting    = false;
 verboseOutput = false;
+
+%% 1. Initial State Definitions
+PDIState = struct('altitude', 15240, ...
+                  'lonInitDeg', 41.85, ...
+                  'latInitDeg', -71.59, ...
+                  'inertialVelocity', 1693.8, ...
+                  'flightPathAngleDeg', 0, ...
+                  'azimuth', 180);
+
+planetaryParams = struct('rPlanet', 1736.01428 * 1000, ...
+                         'gPlanet', 1.622, ...
+                         'gEarth', 9.81);
+
+vehicleParams = struct('massInit', 15103.0, ...
+                       'dryMass', 6855, ...
+                       'isp', 311, ...
+                       'maxThrust', 45000, ...
+                       'minThrust', 4500);
+
+targetState = struct('landingLonDeg', 41.85, ...
+                     'landingLatDeg', -90.0, ...
+                     'rfLanding', [0;0;0], ...
+                     'vfLanding', [0;0;-1], ...
+                     'afLanding', [0;0;2*planetaryParams.gPlanet], ...
+                     'divertEnabled', false, ...
+                     'altDivert', 1000, ...
+                     'divertPoints', [0,0,0]);
+
+%% 2. Optimization Configuration
+optimizationParams = struct;
+optimizationParams.paramsX0          = paramsIC;
+optimizationParams.nodeCount         = 301;
+optimizationParams.glideSlopeEnabled    = glideSlopeEnabled;
+optimizationParams.glideSlopeFinalTheta = 45;
+optimizationParams.glideSlopeHigh       = 500;
+optimizationParams.glideSlopeLow        = 250;
+optimizationParams.freeGlideNodes       = 1;
+optimizationParams.pointingEnabled   = pointingEnabled;
+optimizationParams.maxTiltAccel      = 2;
+optimizationParams.minPointing       = 10;
+optimizationParams.updateOpt         = false;
+optimizationParams.updateFreq        = 10;
+optimizationParams.updateStop        = 120;
+optimizationParams.gamma1eps         = 1e-2;
+optimizationParams.gamma2eps         = 1e-2;
 
 %% Setup Stats 3 Sigma Ranges
 seedDir = fileparts(mfilename("fullpath"));
 seedFilenames = struct( ...
-    'alt', fullfile(seedDir,'Seeds/alt_seeds.dat'), ...
-    'lon', fullfile(seedDir,'Seeds/lon_seeds.dat'), ...
-    'lat', fullfile(seedDir,'Seeds/lat_seeds.dat'), ...
-    'v', fullfile(seedDir,'Seeds/V_seeds.dat'), ...
-    'fpa', fullfile(seedDir,'Seeds/fpa_seeds.dat'), ...
-    'azmth', fullfile(seedDir,'Seeds/azmth_seeds.dat'), ...
-    'mass', fullfile(seedDir,'Seeds/mass_seeds.dat'));
+    'alt', fullfile(seedDir,'Seeds','alt_seeds.dat'), ...
+    'lon', fullfile(seedDir,'Seeds','lon_seeds.dat'), ...
+    'lat', fullfile(seedDir,'Seeds','lat_seeds.dat'), ...
+    'v',   fullfile(seedDir,'Seeds','V_seeds.dat'), ...
+    'fpa', fullfile(seedDir,'Seeds','fpa_seeds.dat'), ...
+    'azmth',fullfile(seedDir,'Seeds','azmth_seeds.dat'), ...
+    'mass', fullfile(seedDir,'Seeds','mass_seeds.dat'));
 
 seeds = struct(...
     'alt_seeds', load(seedFilenames.alt),...
@@ -92,33 +92,31 @@ caseCount = numel(seeds.alt_seeds);
 Results = struct('k',{},'gamma',{},'gamma2',{},'kr',{},'tgo',{},'fuel_opt',{},'fuel_sim',{},...
     'final_error',{},'coeff1',{},'coeff2',{},'coeff3',{},'coeff4',{},'exit_ok',{},'msg',{}, 'exitflag',{});
 
-L_ref = 10000; A_ref = planetaryParams.gPlanet; T_ref = sqrt(L_ref/A_ref); V_ref = L_ref/T_ref; M_ref = 15103.0;
 dispTime = tic;
 %% Stats Loop - Requires Parallel Computing Toolbox
 parfor (idx = 1:caseCount)
     try
-        dalt = seeds.alt_seeds(idx) * (r_disp / 3);
-        dlon = seeds.lon_seeds(idx) * (lon_disp / 3);
-        dlat = seeds.lat_seeds(idx) * (lat_disp / 3);
-        dv = seeds.v_seeds(idx) * (v_disp / 3);
-        dfpa = seeds.fpa_seeds(idx) * (fpa_disp / 3);
-        dazmth = seeds.azmth_seeds(idx) * (azmth_disp / 3);
+        dalt      = seeds.alt_seeds(idx)  * (r_disp    / 3);
+        dlon      = seeds.lon_seeds(idx)  * (lon_disp  / 3);
+        dlat      = seeds.lat_seeds(idx)  * (lat_disp  / 3);
+        dv        = seeds.v_seeds(idx)    * (v_disp    / 3);
+        dfpa      = seeds.fpa_seeds(idx)  * (fpa_disp  / 3);
+        dazmth    = seeds.azmth_seeds(idx)* (azmth_disp/ 3);
         mass_mult = seeds.mass_seeds(idx) * (mass_disp / 3);
 
-        PDI = PDINom;
-        PDI.altitude_km = PDINom.altitude / 1000 + dalt/1000;
-        PDI.lonInitDeg = PDINom.lonInitDeg + dlon;
-        PDI.latInitDeg = PDINom.latInitDeg + dlat;
-        PDI.inertialVelocity = PDINom.inertialVelocity + dv;
-        PDI.flightPathAngleDeg = PDINom.flightPathAngleDeg + dfpa;
-        PDI.azimuth = PDINom.azimuth + dazmth;
+        PDI = PDIState;
+        PDI.altitude           = PDIState.altitude           + dalt;
+        PDI.lonInitDeg         = PDIState.lonInitDeg         + dlon;
+        PDI.latInitDeg         = PDIState.latInitDeg         + dlat;
+        PDI.inertialVelocity   = PDIState.inertialVelocity   + dv;
+        PDI.flightPathAngleDeg = PDIState.flightPathAngleDeg + dfpa;
+        PDI.azimuth            = PDIState.azimuth            + dazmth;
 
-        vehicle = vehicleNom;
-        vehicle.massInit = vehicleNom.massInit * (1+ mass_mult);
-        vehicle.dryMass = vehicle.massInit - 8248; % this way makes the dry mass variable but fuel amount constant
+        vehicle = vehicleParams;
+        vehicle.massInit = vehicleParams.massInit * (1 + mass_mult);
+        vehicle.dryMass  = vehicle.massInit - 8248; % keeps fuel amount constant, varies dry mass
 
-
-        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, betaParam, doPlotting, verboseOutput, true, runSimulation);
+        [gammaOpt, gamma2Opt, krOpt, tgoOpt, ~, exitflag, optFuel, simFuel, ~, finalPosSim, ~, ~, ~] = getParams(PDI, planetaryParams, targetState, vehicle, optimizationParams, betaParam, doPlotting, verboseOutput, runSimulation);
         
         Results(idx).k = idx;
         Results(idx).gamma = gammaOpt;
@@ -136,9 +134,21 @@ parfor (idx = 1:caseCount)
         Results(idx).msg = '';
         Results(idx).exitflag = exitflag;
     catch ME
-        Results(idx).k = idx;
-        Results(idx).exit_ok = false;
-        Results(idx).msg = ME.message;
+        Results(idx).k         = idx;
+        Results(idx).exit_ok   = false;
+        Results(idx).msg       = ME.message;
+        Results(idx).gamma     = NaN;
+        Results(idx).gamma2    = NaN;
+        Results(idx).kr        = NaN;
+        Results(idx).tgo       = NaN;
+        Results(idx).fuel_opt  = NaN;
+        Results(idx).fuel_sim  = NaN;
+        Results(idx).final_error = [NaN; NaN; NaN];
+        Results(idx).coeff1    = NaN;
+        Results(idx).coeff2    = NaN;
+        Results(idx).coeff3    = NaN;
+        Results(idx).coeff4    = NaN;
+        Results(idx).exitflag  = NaN;
     end
     send(queue,1);
 end

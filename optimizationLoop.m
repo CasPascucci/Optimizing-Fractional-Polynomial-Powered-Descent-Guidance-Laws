@@ -1,4 +1,4 @@
-function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, delta_t, verboseOutput, dispersion)
+function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActiveConstraints] = optimizationLoop(paramsX0, betaParam, problemParams, nonDimParams, optimizationParams, refVals, verboseOutput)
 
     % Some Tweakable Parameters / Defaults
     if optimizationParams.gamma1eps < 0
@@ -101,9 +101,11 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActi
     gamma2 = optParams(2);
     if gamma1 < 0
         gamma1 = 0;
+        optParams(1) = gamma1;
     end
     if gamma2 < 0
         gamma2 = 0;
+        optParams(2) = gamma2;
     end
 
     [c1, c2] = calculateCoeffs(r0, v0, optParams(3), gamma1, gamma2, afStar, rfStar, vfStar, gConst);
@@ -130,7 +132,7 @@ function [optParams, optCost, aTOptim, mOptim, rdOptim, vdOptim, exitflag, nActi
     Q = cumtrapz(tgospan,aTNorm./isp);
     Q = Q(end) - Q;
 
-    mOptim = 1 .* exp(-Q);
+    mOptim = nonDimParams.m0ND .* exp(-Q);
 
     
 end
@@ -190,7 +192,7 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     nPointCon = 0;
     
     if glideSlopeFlag % num constraint needs to be consistent, preallocate number of constraints for glideslope and pointing
-        nGlideCon = floor(nodeCount * 0.15); % bottom 15% of trajectory is analyzed
+        nGlideCon = nodeCount;
     end
     if pointingFlag
         nPointCon = nodeCount;
@@ -208,7 +210,6 @@ function [c, ceq] = nonLinearLimits(params, r0, v0, rfStar, vfStar, afStar, gCon
     idx = idx + nodeCount;
 
     if glideSlopeFlag
-        nGlideCon = nodeCount;
         tgospanGlide = tgospan(1:nGlideCon);
         phi1hat = (tgospanGlide.^(gamma1+2))./((gamma1+1)*(gamma1+2));
         phi2hat = (tgospanGlide.^(gamma2+2))./((gamma2+1)*(gamma2+2));

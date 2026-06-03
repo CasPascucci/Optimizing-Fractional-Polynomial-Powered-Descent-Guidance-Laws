@@ -1,76 +1,63 @@
-clear all;  clc; format short
-%close all;
+clear all; clc; format short
 addpath([pwd, '/CoordinateFunctions']);
 
 %% Key Parameters
-beta = 0.6;  % Weighting: 1.0 = Fuel Optimal, 0.0 = Smoothest Throttle
+betaVec = [0.7]; % Called betaVec because a vector of beta values can be given, with each one being ran one after another on the same figures for comparison
+%betaVec = 1.0:-0.05:0.0 % Example of alternate way to give a beta vector
 
-% First IC set is for everything but GS
-paramsIC = [0.3, 0.4, 700]; % Initial guess in optimization for gamma1, gamma2, tgo (dimensional seconds)
-%paramsIC = [0.5, 0.8, 700]; % Use for GS, recommended to stay to higher values
+paramsIC = [0.3, 0.4, 700]; % Good for everything but GS
+% paramsIC = [0.5, 0.8, 700]; % Use for GS
 
-glideSlopeEnabled = false;
-pointingEnabled = false;
+glideSlopeEnabled    = false;
+pointingEnabled      = false;
 reOptimizationEnabled = false;
-divertEnabled = false; % Will internally force reOpt On, glideSlope and pointing Off
+divertEnabled        = false; % will internally disable GS and PT, and will enable reOpt
 
 %% 1. Initial State Definitions
-% PDI (Powered Descent Initiation) State, Dimensional
-PDIState = struct('altitude', 15240, ... % meters
-                  'lonInitDeg', 41.85, ... % deg
-                  'latInitDeg', -71.59, ... % deg
-                  'inertialVelocity', 1693.8, ... % m/s
-                  'flightPathAngleDeg', 0, ... % deg, angle below horizontal for initial trajectory
-                  'azimuth', 180); % deg, heading angle, clockwise from North
+PDIState = struct('altitude', 15240, ...
+                  'lonInitDeg', 41.85, ...
+                  'latInitDeg', -71.59, ...
+                  'inertialVelocity', 1693.8, ...
+                  'flightPathAngleDeg', 0, ...
+                  'azimuth', 180);
 
-planetaryParams = struct('rPlanet', 1736.01428 * 1000, ... % m
-                         'gPlanet', 1.622, ... % m/s^2
-                         'gEarth', 9.81); % m/s^2
+planetaryParams = struct('rPlanet', 1736.01428 * 1000, ...
+                         'gPlanet', 1.622, ...
+                         'gEarth', 9.81);
 
-vehicleParams = struct('massInit', 15103.0, ... % kg
-                       'dryMass', 6855, ... % kg
-                       'isp', 311, ... % seconds
-                       'maxThrust', 45000, ... % Newtons
-                       'minThrust', 4500); % N
+vehicleParams = struct('massInit', 15103.0, ...
+                       'dryMass', 6855, ...
+                       'isp', 311, ...
+                       'maxThrust', 45000, ...
+                       'minThrust', 4500);
 
-targetState = struct('landingLonDeg', 41.85, ... % deg
-                     'landingLatDeg', -90.00, ... % deg
-                     'rfLanding', [0;0;0], ...  % meters, centered at lunar radius at above landing coordinates
-                     'vfLanding', [0;0;-1], ...  % m/s
-                     'afLanding', [0;0;2*planetaryParams.gPlanet], ... % m/s^2
-                     'delta_t', 5, ... % seconds, not currently implemented
-                     'divertEnabled', divertEnabled); % Requires reopt on, will disable pointing and glideslope if not already done, and will enable Re-Opt
+targetState = struct('landingLonDeg', 41.85, ...
+                     'landingLatDeg', -90.00, ...
+                     'rfLanding', [0;0;0], ...
+                     'vfLanding', [0;0;-1], ...
+                     'afLanding', [0;0;2*planetaryParams.gPlanet], ...
+                     'divertEnabled', divertEnabled);
 
 %% 2. Optimization Configuration
 optimizationParams = struct;
-optimizationParams.paramsX0 = paramsIC;
-
-optimizationParams.nodeCount = 301; % Node Count for Optimization, must be odd for Simpson's rule
-
-% Glideslope Constraints
+optimizationParams.paramsX0       = paramsIC;
+optimizationParams.nodeCount       = 301;
 optimizationParams.glideSlopeEnabled    = glideSlopeEnabled;
-optimizationParams.glideSlopeFinalTheta = 45;  % deg
-optimizationParams.glideSlopeHigh       = 500; % m
-optimizationParams.glideSlopeLow        = 250; % m
-optimizationParams.freeGlideNodes     = 1;  % Number of optimization nodes starting at landing site, counting backwards, to leave unconstrained for glideslope. Default is 1, as landing node requires infinite precision
-
-% Pointing Constraints
+optimizationParams.glideSlopeFinalTheta = 45;
+optimizationParams.glideSlopeHigh       = 500;
+optimizationParams.glideSlopeLow        = 250;
+optimizationParams.freeGlideNodes       = 1;
 optimizationParams.pointingEnabled = pointingEnabled;
-optimizationParams.maxTiltAccel    = 2;  % deg/s^2
-optimizationParams.minPointing     = 10; % deg
+optimizationParams.maxTiltAccel    = 2;
+optimizationParams.minPointing     = 10;
+optimizationParams.updateOpt  = reOptimizationEnabled;
+optimizationParams.updateFreq = 30;
+optimizationParams.updateStop = 120;
+optimizationParams.gamma1eps  = 1e-2;
+optimizationParams.gamma2eps  = 1e-2;
 
-% Re-Optimization Settings
-optimizationParams.updateOpt  = reOptimizationEnabled; 
-optimizationParams.updateFreq = 5;   % s
-optimizationParams.updateStop = 120;   % s (Time before landing to stop updates)
-
-% Tolerances
-optimizationParams.gamma1eps = 1e-2;
-optimizationParams.gamma2eps = 1e-2;
-
-% Divert
-divertDistances = [1000, 2000, 3000]; % Distances in meters away from original site, the 8-point rings of divert will occur at each of these distances
-
+% Divert setup
+divertDistances = [1000, 2000, 3000];
 divert1E = zeros(length(divertDistances),1); % each line here sets up the North and East Coordinates of the divert points
 divert1N = divertDistances';
 divert2E = divertDistances'.*cosd(45);
@@ -100,43 +87,70 @@ targetState.divertPoints = [0, 0, 0;
                             divert6E, divert6N, zeros(length(divertDistances),1);
                             divert7E, divert7N, zeros(length(divertDistances),1);
                             divert8E, divert8N, zeros(length(divertDistances),1)];
-%targetState.divertPoints = [-150, -300, 0]; % meters % Single case, above block is multiple divert plots
-targetState.altDivert = 1000; % m, altitude above ground to trigger divert scenario
+targetState.altDivert = 1000;
 
-%% 3. Execution Flags & Run
+%% 3. Beta Sweep Loop
 runSimulation = true;
-doPlotting    = true; 
-verboseOutput = true;
-timePreParam = toc;
+doPlotting    = true;
+verboseOutput = false;  % Recommend false during sweeps
 
-if ~ targetState.divertEnabled
-[gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
- aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
- nonDimParams, refVals, optTable, simTable] = getParams(PDIState, planetaryParams, targetState, ...
-    vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
-else
- [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, ~, optFuelCost, simFuelCost, ...
- aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
- nonDimParams, refVals] = getParamsDIVERT(PDIState, planetaryParams, targetState, ...
-    vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
+nBeta   = length(betaVec);
+results = struct(); % Preallocate results struct
+
+for i = 1:nBeta
+    beta = betaVec(i);
+    if ~targetState.divertEnabled
+        [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, optExitFlag, optFuelCost, simFuelCost, ...
+         aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
+         nonDimParams, refVals, optTable, simTable, nActive] = getParams(PDIState, planetaryParams, targetState, ...
+            vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
+    else
+        [gammaOpt, gamma2Opt, krOpt, tgoOptSec, ~, optExitFlag, optFuelCost, simFuelCost, ...
+         aTSim, finalPosSim, optHistory, ICstates, exitFlags, problemParams, ...
+         nonDimParams, refVals] = getParamsDIVERT(PDIState, planetaryParams, targetState, ...
+            vehicleParams, optimizationParams, beta, doPlotting, verboseOutput, false, runSimulation);
+        optTable  = [NaN; NaN; NaN];
+        simTable  = [NaN; NaN; NaN];
+    end
+
+    if ~targetState.divertEnabled
+
+        % Store results for this beta
+        results(i).beta        = beta;
+        results(i).gammaOpt    = gammaOpt;
+        results(i).gamma2Opt   = gamma2Opt;
+        results(i).krOpt       = krOpt;
+        results(i).tgoOptSec   = tgoOptSec;
+        results(i).optFuelCost = optFuelCost;
+        results(i).simFuelCost = simFuelCost;
+        results(i).costValue   = optTable(3);
+        results(i).simCost     = simTable(3);
+        results(i).landingError = optTable(1);
+        results(i).exitFlag       = optExitFlag;
+        results(i).nActive        = nActive;
+        results(i).exitFlags      = exitFlags;
+        if ~isempty(finalPosSim)
+            results(i).simLandingError = norm(finalPosSim);  % [m]
+        else
+            results(i).simLandingError = NaN;
+        end
+    end
 end
 
-%% 4. Results Display
-if optimizationParams.updateOpt
-    fprintf("\n--- Initial Solution ---\n")
-else
-    fprintf('\n--- Final Results ---\n');
+%% 4. Summary Table
+if ~targetState.divertEnabled
+    fprintf('\n\n========== BETA SWEEP SUMMARY ==========\n');
+    fprintf('%-8s %-10s %-10s %-8s %-12s %-8s %-12s %-8s %-12s %-12s %-8s %-8s\n', ...
+            'Beta', 'Gamma1', 'Gamma2', 'Kr', 'Tgo (s)', 'Cost', 'Opt Fuel', 'Sim Cost', 'Sim Fuel', 'SimErr (m)', 'ExitFlag', 'NActive');
+    fprintf('%s\n', repmat('-', 1, 106));
+    
+    for i = 1:nBeta
+        r = results(i);
+        fprintf('%-8.4f %-10.4f %-10.4f %-8.4f %-12.2f %-8.4f %-12.2f %-8.4f %-12.2f %-12.3f %-8d %-8d\n', ...
+                r.beta, r.gammaOpt, r.gamma2Opt, r.krOpt, ...
+                r.tgoOptSec, r.costValue, r.optFuelCost, r.simCost, r.simFuelCost, r.simLandingError, r.exitFlag, r.nActive);
+    
+    end
 end
-fprintf('Gamma1:      %.4f\n', gammaOpt);
-fprintf('Gamma2:      %.4f\n', gamma2Opt);
-fprintf('Kr:          %.4f\n', krOpt);
-fprintf('Tgo (sec):   %.2f\n', tgoOptSec);
-fprintf('Cost Value:  %.4f\n', optTable(3));
-fprintf('Opt Fuel:    %.2f kg\n', optFuelCost);
-fprintf('Sim Fuel:    %.2f kg\n', simFuelCost);
-if exist("simTable","var") && ~isempty(simTable)
-    fprintf('Sim Cost J:  %.4f\n', simTable(3));
-end
-if exist("optTable","var")
-    table(optTable,simTable, 'VariableNames',["Optimization", "Simulation"],'RowNames',["Landing Error", "Fuel Cost", "Cost Function"]);
-end
+%% 5. Optional: Save results
+% save('betaSweepResults.mat', 'results', 'betaVec');
